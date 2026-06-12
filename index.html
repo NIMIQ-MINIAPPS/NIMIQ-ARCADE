@@ -2,9 +2,139 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- Primary SEO -->
+    <title>NIM-ARCADE — Web3 Arcade Games on Nimiq Pay</title>
+    <meta name="description" content="Play 30 brain-training and classic arcade games, earn XP, convert to NIM crypto, and compete in tournaments — all inside Nimiq Pay. No wallet setup needed." />
+    <meta name="keywords" content="Nimiq games, NIM crypto games, web3 arcade, play to earn Nimiq, Nimiq Pay mini app, brain training games, NIM tokens, crypto arcade" />
+    <meta name="author" content="NIM-ARCADE" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <link rel="canonical" href="https://nim-arcade.app/" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="NIM-ARCADE" />
+    <meta property="og:title" content="NIM-ARCADE — Earn NIM Playing Arcade Games" />
+    <meta property="og:description" content="30 arcade and brain-training games inside Nimiq Pay. Play, earn XP, convert to real NIM crypto. Free to play, tournaments available." />
+    <meta property="og:url" content="https://nim-arcade.app/" />
+    <meta property="og:image" content="https://nim-arcade.app/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@nimiq" />
+    <meta name="twitter:title" content="NIM-ARCADE — Web3 Arcade on Nimiq Pay" />
+    <meta name="twitter:description" content="Play 30 arcade games, earn XP, convert to NIM. The first arcade platform built inside Nimiq Pay." />
+    <meta name="twitter:image" content="https://nim-arcade.app/og-image.png" />
+
+    <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>nimiq-arcade</title>
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#fdfde7" />
+
+    <!-- Structured Data: WebApplication -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "NIM-ARCADE",
+      "url": "https://nim-arcade.app",
+      "description": "Web3 arcade gaming platform built on Nimiq Pay. Play 30 games, earn XP convertible to NIM cryptocurrency, compete in tournaments.",
+      "applicationCategory": "GameApplication",
+      "operatingSystem": "Web",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "NIM",
+        "description": "Free to play. Earn NIM through gameplay. Tournament entry from 0.001 NIM."
+      },
+      "featureList": [
+        "30 arcade and brain-training games",
+        "XP to NIM cryptocurrency conversion",
+        "Online multiplayer rooms",
+        "Daily, weekly, monthly tournaments",
+        "Nimiq Pay wallet integration",
+        "Leaderboards and achievements"
+      ],
+      "inLanguage": "en",
+      "creator": {
+        "@type": "Organization",
+        "name": "NIM-ARCADE",
+        "url": "https://nim-arcade.app"
+      }
+    }
+    </script>
+
+    <!-- Structured Data: FAQPage -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is NIM-ARCADE?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "NIM-ARCADE is a Web3 arcade gaming platform built as a Nimiq Pay Mini App. Players can play 30 arcade and brain-training games, earn XP, convert XP to NIM cryptocurrency, and compete in online tournaments — all without leaving the Nimiq Pay app."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do you earn NIM playing NIM-ARCADE?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Every game awards XP based on score and difficulty. 1,000 XP equals 0.001 NIM. Players can convert accumulated XP to real NIM tokens directly through their Nimiq Pay wallet. Daily limits and anti-farming mechanics ensure a sustainable economy."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is NIM-ARCADE free to play?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. All 30 games are free to play. Tournament entry fees start at 0.001 NIM with prize pools distributed 70/20/10 to the top three places. Online multiplayer rooms have optional entry fees from 0.001 NIM."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What games are on NIM-ARCADE?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "NIM-ARCADE has 30 games across 4 categories: Brain Training (Memory Matrix, Color Stroop, Dual N-Back), Classic Arcade (Nimtris/Tetris, Hex Fall/Block Blast, Snake, Space Shooter), Action (Hex Runner endless runner, Quick Tap reflex game, Gravity Switch), and Puzzle (Memory Rush, Merge Hex/2048, Color Path). New games are added regularly."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Do I need a crypto wallet to play NIM-ARCADE?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "NIM-ARCADE runs inside Nimiq Pay, which manages your NIM wallet automatically. No setup, no seed phrases, no external wallets required. Just open the Mini App inside Nimiq Pay and start playing."
+          }
+        }
+      ]
+    }
+    </script>
+
+    <!-- Structured Data: ItemList (Games) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "ItemList",
+      "name": "NIM-ARCADE Games",
+      "description": "Complete list of arcade and brain training games available on NIM-ARCADE",
+      "numberOfItems": 30,
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Nimtris", "url": "https://nim-arcade.app/#nimtris" },
+        { "@type": "ListItem", "position": 2, "name": "Hex Fall", "url": "https://nim-arcade.app/#hexfall" },
+        { "@type": "ListItem", "position": 3, "name": "Memory Matrix", "url": "https://nim-arcade.app/#memory-matrix" },
+        { "@type": "ListItem", "position": 4, "name": "Hex Runner", "url": "https://nim-arcade.app/#runner" },
+        { "@type": "ListItem", "position": 5, "name": "Quick Tap", "url": "https://nim-arcade.app/#quicktap" }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

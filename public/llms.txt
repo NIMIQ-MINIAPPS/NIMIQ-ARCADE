@@ -1,0 +1,103 @@
+# NIM-ARCADE
+
+> Web3 arcade gaming platform built as a Nimiq Pay Mini App.
+
+NIM-ARCADE lets players earn real NIM cryptocurrency by playing 30 arcade
+and brain-training games, competing in online tournaments, and converting
+accumulated XP to NIM tokens — all without leaving the Nimiq Pay app.
+
+## What is NIM-ARCADE?
+
+NIM-ARCADE is a play-to-earn arcade platform built on the Nimiq blockchain.
+It runs as a Mini App inside Nimiq Pay, using the Nimiq Mini App SDK for
+wallet integration. Players never need to manage private keys or set up
+external wallets — Nimiq Pay handles all of that.
+
+## How the XP Economy Works
+
+- Every game awards XP based on score and difficulty multiplier
+- 1,000 XP = 0.001 NIM (conversion rate)
+- Daily earning cap: 50,000 XP per day with progressive reduction
+  - First 5,000 XP: 100% rate
+  - Next 5,000 XP: 70% rate
+  - Remaining: 40% rate
+- Anti-farming: device identifier via Nimiq SDK, rate limits, score validation
+
+## Games (30 total)
+
+### Brain Training
+- Memory Matrix — memorize lit grid patterns
+- Color Stroop — name ink color, not the word
+- Dual N-Back — working memory training
+- Number Flow — mental arithmetic chains
+- Pattern Sync — complete visual sequences
+- Focus Grid — selective attention
+- Speed Sort — rapid classification
+- Word Flux — verbal fluency
+
+### Classic Arcade
+- Nimtris — Tetris with combo scoring
+- Hex Fall — Block Blast group clearing
+- Snake Path — classic snake
+- Space Raid — vertical shoot-em-up
+- Breakwall — Breakout/Arkanoid
+- Pac Maze — maze chaser
+- Asteroid Field — Asteroids-style
+- Frog Cross — Frogger-style
+- Pong Duel — 1v1 online paddle
+
+### Action
+- Hex Runner — endless runner (available now)
+- Quick Tap — reflex tapping (available now)
+- Gravity Switch — flip gravity corridor
+- Neon Blade — swipe-to-slice
+- Dodge Storm — projectile survival
+- Tower Stack — precision stacking
+
+### Puzzle
+- Memory Rush — card matching with timer (available now)
+- Merge Hex — 2048 on hexagonal grid
+- Color Path — connect matching colors
+- Shift Blocks — slide puzzle
+- Hex Flow — pipe rotation puzzle
+- Light Bounce — mirror reflection puzzle
+- Sum Path — arithmetic path puzzle
+
+## Pricing
+
+Free to play. No purchase required.
+
+- Solo games: FREE
+- Tournament entry: 0.001–0.05 NIM per tournament
+- Online rooms: 0.001–0.01 NIM optional entry fee
+- Prize distribution: 70% first place, 20% second, 10% third
+- Platform fee: 5% of tournament prize pools
+
+## Technology
+
+- Frontend: React, Vite, TypeScript, Tailwind CSS, Framer Motion
+- Blockchain: Nimiq Web Client, Nimiq Mini App SDK
+- Wallet: Nimiq Pay (custody — no private key exposure)
+- Multiplayer: WebSocket server (coming)
+- Backend: Node.js + Express + Supabase (coming)
+
+## Key URLs
+
+- App: https://nim-arcade.app
+- GitHub: https://github.com/NIMIQ-MINIAPPS/NIMIQ-ARCADE
+- Nimiq Pay: https://nimiq.com/pay
+
+## Frequently Asked Questions
+
+**Do I need a wallet to play?**
+No. NIM-ARCADE runs inside Nimiq Pay which manages your wallet automatically.
+
+**Is it free to play?**
+All 30 games are free. Tournaments have optional entry fees starting at 0.001 NIM.
+
+**How do I earn NIM?**
+Play games to earn XP. Convert XP to NIM at 1,000 XP = 0.001 NIM through your Nimiq Pay wallet.
+
+**What is Nimiq?**
+Nimiq is a browser-native blockchain focused on ease of use and accessibility.
+NIM is its native cryptocurrency.
