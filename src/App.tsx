@@ -39,7 +39,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex flex-col min-h-dvh bg-[#080808] relative scanlines">
+    <div className="flex flex-col min-h-dvh relative" style={{ background: 'var(--bg)' }}>
       <main className="flex-1 overflow-y-auto pb-20">
         <AnimatePresence mode="wait">
           <motion.div

@@ -1,17 +1,13 @@
 @import "tailwindcss";
 
 @layer base {
-  * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
 
   html, body, #root {
     width: 100%;
     height: 100%;
-    background: #080808;
-    color: #ffffff;
+    background: #0C0A06;
+    color: #EDE0BC;
     font-family: 'Inter', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
@@ -25,31 +21,59 @@
   }
 }
 
+:root {
+  --bg:          #0C0A06;
+  --surface:     #16130E;
+  --surface-2:   #201C15;
+  --border:      #2D2820;
+  --border-2:    #3D3628;
+
+  --cream:       #EDE0BC;
+  --cream-dim:   #B5A882;
+  --cream-muted: #6B6047;
+  --cream-faint: #2A2318;
+
+  --gold:        #D4A843;
+  --gold-bright: #E8C84A;
+  --gold-pale:   #F2E4A0;
+  --gold-dim:    #8A6E28;
+  --gold-deep:   #3D3218;
+
+  --green:       #7DB87A;
+  --red:         #C46B5A;
+  --blue:        #6A9BC4;
+  --purple:      #9B7EC4;
+}
+
 @layer utilities {
-  .glow-yellow {
-    box-shadow: 0 0 20px rgba(255, 193, 7, 0.4), 0 0 40px rgba(255, 193, 7, 0.2);
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
   }
-  .glow-yellow-sm {
-    box-shadow: 0 0 10px rgba(255, 193, 7, 0.3);
+  .card-elevated {
+    background: var(--surface-2);
+    border: 1px solid var(--border-2);
   }
-  .glow-text {
-    text-shadow: 0 0 20px rgba(255, 193, 7, 0.6);
+  .glow-gold {
+    box-shadow: 0 0 24px rgba(212,168,67,.35), 0 0 48px rgba(212,168,67,.15);
   }
-  .pixel-border {
-    border: 2px solid #FFC107;
-    box-shadow: 0 0 0 1px #080808, 0 0 0 3px #FFC107;
+  .glow-gold-sm {
+    box-shadow: 0 0 12px rgba(212,168,67,.25);
   }
-  .arcade-card {
-    background: linear-gradient(135deg, #111111 0%, #1a1a1a 100%);
-    border: 1px solid rgba(255, 193, 7, 0.2);
-  }
-  .scanlines {
-    background: repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(0,0,0,0.03) 2px,
-      rgba(0,0,0,0.03) 4px
+  .text-cream  { color: var(--cream); }
+  .text-dim    { color: var(--cream-dim); }
+  .text-muted  { color: var(--cream-muted); }
+  .text-gold   { color: var(--gold); }
+  .text-gold-b { color: var(--gold-bright); }
+
+  .no-scrollbar { scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+
+  .warm-scanlines {
+    background-image: repeating-linear-gradient(
+      0deg, transparent, transparent 3px,
+      rgba(212,168,67,.018) 3px, rgba(212,168,67,.018) 4px
     );
+    pointer-events: none;
   }
 }

@@ -12,35 +12,41 @@ export default function XpBar({ xp, compact = false }: XpBarProps) {
   if (compact) {
     return (
       <div className="flex items-center gap-2">
-        <span className="text-[10px] font-bold text-[#FFC107] tracking-wider">LVL {level}</span>
-        <div className="flex-1 h-1.5 bg-[#222] rounded-full overflow-hidden">
+        <span className="text-[10px] font-black tracking-wider" style={{ color: 'var(--gold)' }}>
+          LVL {level}
+        </span>
+        <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
           <motion.div
-            className="h-full bg-gradient-to-r from-[#FFC107] to-[#FF9800] rounded-full"
+            className="h-full rounded-full"
+            style={{ background: 'linear-gradient(90deg, var(--gold), var(--gold-bright))' }}
             initial={{ width: 0 }}
             animate={{ width: `${progress}%` }}
             transition={{ duration: 0.8, ease: 'easeOut' }}
           />
         </div>
-        <span className="text-[10px] text-[#555]">{xpForNext} XP</span>
+        <span className="text-[10px]" style={{ color: 'var(--cream-muted)' }}>
+          {xpForNext.toLocaleString()}
+        </span>
       </div>
     )
   }
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1.5">
       <div className="flex justify-between items-center">
-        <span className="text-xs font-bold text-[#FFC107]">LEVEL {level}</span>
-        <span className="text-xs text-[#666]">{xp.toLocaleString()} / {xpForNext.toLocaleString()} XP</span>
+        <span className="text-xs font-black" style={{ color: 'var(--gold)' }}>LEVEL {level}</span>
+        <span className="text-[11px]" style={{ color: 'var(--cream-muted)' }}>
+          {xp.toLocaleString()} / {xpForNext.toLocaleString()} XP
+        </span>
       </div>
-      <div className="h-2 bg-[#1a1a1a] rounded-full overflow-hidden border border-[#333]">
+      <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--cream-faint)', border: '1px solid var(--border)' }}>
         <motion.div
-          className="h-full bg-gradient-to-r from-[#FFC107] to-[#FF9800] rounded-full relative"
+          className="h-full rounded-full"
+          style={{ background: 'linear-gradient(90deg, var(--gold), var(--gold-bright))' }}
           initial={{ width: 0 }}
           animate={{ width: `${progress}%` }}
           transition={{ duration: 1, ease: 'easeOut' }}
-        >
-          <div className="absolute inset-0 bg-white/20 rounded-full" />
-        </motion.div>
+        />
       </div>
     </div>
   )
