@@ -196,22 +196,31 @@ function WordFlux({ className }: IllProps) {
 
 // ── CLASSIC ARCADE ─────────────────────────────────────────────────────────
 function Nimtris({ className }: IllProps) {
-  const board = [
-    [0,0,1,1,0,0],[0,1,1,1,0,0],[1,0,1,1,1,0],
-    [1,1,1,1,1,0],[1,1,0,1,1,1],[0,1,1,1,1,1],
+  const pastels = ['#93DCFF','#C4B5FD','#86EFAC','#FDBA74','#FCD34D','#F9A8D4','#67E8F9']
+  const stack = [
+    [0,1,2,3,4,5],[6,0,1,2,3,4],[null,5,6,0,1,null],[null,null,2,3,null,null],
   ]
-  const palette = [G, C, GB, '#7DB87A', '#9B7EC4', '#6A9BC4']
+  const S = 13, ox = 28, oy = 8
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill={BG} />
-      <rect x="34" y="8" width="72" height="90" rx="2" fill={S} />
-      {board.map((row, r) => row.map((v, c) => v ? (
-        <rect key={`${r}-${c}`} x={36+c*12} y={10+r*14} width="11" height="13" rx="1.5"
-          fill={palette[(r+c)%palette.length]} opacity=".85" />
+      <rect width="160" height="108" fill="#FFF8E8" />
+      <rect x={ox-2} y={oy-2} width={6*S+4} height={4*S+4+40} rx={4} fill="white" opacity={0.7}/>
+      {/* stacked blocks */}
+      {stack.map((row, ri) => row.map((ci, col) => ci !== null ? (
+        <rect key={`${ri}-${col}`}
+          x={ox + col*S + 1} y={oy + (stack.length-1-ri)*S + 42}
+          width={S-2} height={S-2} rx={2}
+          fill={pastels[ci % pastels.length]} opacity={0.9}
+        />
       ) : null))}
-      {/* falling piece */}
-      {[[0,1],[1,1],[2,1]].map(([dc,dr]) => (
-        <rect key={`p${dc}`} x={36+(3+dc)*12} y={10+dr*14} width="11" height="13" rx="1.5" fill={GB} />
+      {/* falling I-piece */}
+      {[0,1,2,3].map(i => (
+        <rect key={i} x={ox+i*S+1} y={oy+4} width={S-2} height={S-2} rx={2} fill="#93DCFF" opacity={0.95}/>
+      ))}
+      {/* speed lines */}
+      {[0,1,2,3].map(i => (
+        <line key={i} x1={ox+i*S+(S/2)} y1={oy} x2={ox+i*S+(S/2)} y2={oy+2}
+          stroke="#93DCFF" strokeWidth={1.5} opacity={0.5}/>
       ))}
     </svg>
   )
