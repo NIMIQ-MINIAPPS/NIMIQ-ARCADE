@@ -9,6 +9,13 @@ import HexfallGame from '../games/hexfall/HexfallGame'
 import MemoryGame from '../games/memory/MemoryGame'
 import QuickTapGame from '../games/quicktap/QuickTapGame'
 import RunnerGame from '../games/runner/RunnerGame'
+import SnakeGame from '../games/snake/SnakeGame'
+import TowerStackGame from '../games/tower/TowerStackGame'
+import PongGame from '../games/pong/PongGame'
+import MemoryMatrixGame from '../games/matrix/MemoryMatrixGame'
+import NumberFlowGame from '../games/numberflow/NumberFlowGame'
+import PatternSyncGame from '../games/patternsync/PatternSyncGame'
+import BreakwallGame from '../games/breakwall/BreakwallGame'
 import { Lock, Star, Zap, ChevronRight } from 'lucide-react'
 
 const CAT_LABELS: Record<Exclude<GameCategory,'all'>, string> = {
@@ -125,6 +132,13 @@ export default function GamesPage() {
       case 'memory':        return <MemoryGame   onExit={() => setActiveGame(null)} />
       case 'quicktap':      return <QuickTapGame onExit={() => setActiveGame(null)} />
       case 'runner':        return <RunnerGame   onExit={() => setActiveGame(null)} />
+      case 'snake-path':   return <SnakeGame    onExit={() => setActiveGame(null)} />
+      case 'tower-stack':  return <TowerStackGame onExit={() => setActiveGame(null)} />
+      case 'pong-duel':    return <PongGame     onExit={() => setActiveGame(null)} />
+      case 'memory-matrix':return <MemoryMatrixGame onExit={() => setActiveGame(null)} />
+      case 'number-flow':  return <NumberFlowGame onExit={() => setActiveGame(null)} />
+      case 'pattern-sync': return <PatternSyncGame onExit={() => setActiveGame(null)} />
+      case 'breakwall':    return <BreakwallGame onExit={() => setActiveGame(null)} />
       default: return null
     }
   }

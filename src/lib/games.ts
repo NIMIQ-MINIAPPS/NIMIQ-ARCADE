@@ -46,7 +46,7 @@ export const GAMES: GameDef[] = [
     category: 'brain',
     difficulty: 'Medium',
     xpMultiplier: 1.2,
-    available: false,
+    available: true,
   },
   {
     id: 'pattern-sync',
@@ -55,7 +55,7 @@ export const GAMES: GameDef[] = [
     category: 'brain',
     difficulty: 'Easy',
     xpMultiplier: 0.9,
-    available: false,
+    available: true,
   },
   {
     id: 'focus-grid',
@@ -110,7 +110,7 @@ export const GAMES: GameDef[] = [
     category: 'classic',
     difficulty: 'Easy',
     xpMultiplier: 0.9,
-    available: false,
+    available: true,
   },
   {
     id: 'space-raid',
@@ -128,7 +128,7 @@ export const GAMES: GameDef[] = [
     category: 'classic',
     difficulty: 'Easy',
     xpMultiplier: 0.9,
-    available: false,
+    available: true,
   },
   {
     id: 'pac-maze',
@@ -164,7 +164,7 @@ export const GAMES: GameDef[] = [
     category: 'classic',
     difficulty: 'Easy',
     xpMultiplier: 1.0,
-    available: false,
+    available: true,
   },
   // ── ACTION ─────────────────────────────────────────────────────────────────
   {
@@ -219,7 +219,7 @@ export const GAMES: GameDef[] = [
     category: 'action',
     difficulty: 'Easy',
     xpMultiplier: 0.9,
-    available: false,
+    available: true,
   },
   // ── PUZZLE ─────────────────────────────────────────────────────────────────
   {
