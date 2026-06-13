@@ -20,19 +20,49 @@ function HexPath({ cx, cy, r, fill, stroke }: { cx: number; cy: number; r: numbe
 
 // ── BRAIN TRAINING ─────────────────────────────────────────────────────────
 function MemoryMatrix({ className }: IllProps) {
-  const lit = [0,2,5,7,9]
+  const R = 11
+  const W = R * Math.sqrt(3)
+  const cols = 5, rows = 4
+  const offsetX = (160 - (cols * W + W / 2)) / 2
+  const offsetY = (108 - (rows * R * 1.5 + R * 0.5)) / 2
+  const lit = new Set([1, 4, 7, 11, 14])
+  const tapped = new Set([1, 7])
+
+  const hexPts = (cx: number, cy: number) =>
+    Array.from({ length: 6 }, (_, i) => {
+      const a = (Math.PI / 3) * i - Math.PI / 6
+      return `${(cx + (R - 1) * Math.cos(a)).toFixed(1)},${(cy + (R - 1) * Math.sin(a)).toFixed(1)}`
+    }).join(' ')
+
+  const positions = Array.from({ length: cols * rows }, (_, i) => {
+    const row = Math.floor(i / cols), col = i % cols
+    return {
+      cx: offsetX + col * W + (row % 2 ? W / 2 : 0) + W / 2,
+      cy: offsetY + row * R * 1.5 + R,
+    }
+  })
+
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill={BG} />
-      {Array.from({ length: 12 }, (_, i) => {
-        const col = i % 4, row = Math.floor(i / 4)
-        const x = 28 + col * 28, y = 18 + row * 28
+      <defs>
+        <linearGradient id="mm-bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#F0F7FF" />
+          <stop offset="100%" stopColor="#CEEAFF" />
+        </linearGradient>
+      </defs>
+      <rect width="160" height="108" fill="url(#mm-bg)" />
+      {positions.map((pos, i) => {
+        const isLit = lit.has(i)
+        const isTapped = tapped.has(i)
+        const fill = isTapped ? '#E9B213' : isLit ? '#4DA8FF' : '#FFFFFF'
+        const stroke = isTapped ? '#C8940E' : isLit ? '#2A88DF' : 'rgba(77,168,255,0.25)'
+        const opacity = isLit && !isTapped ? 0.92 : 1
         return (
-          <rect key={i} x={x} y={y} width="20" height="20" rx="3"
-            fill={lit.includes(i) ? G : S} stroke={lit.includes(i) ? GB : DIM} strokeWidth="1" />
+          <polygon key={i} points={hexPts(pos.cx, pos.cy)}
+            fill={fill} stroke={stroke} strokeWidth="1.2" opacity={opacity}
+            filter={isLit && !isTapped ? 'drop-shadow(0 0 3px #8FD3FF)' : 'drop-shadow(0 1px 2px rgba(0,0,0,0.07))'} />
         )
       })}
-      <text x="80" y="102" textAnchor="middle" fill={DIM} fontSize="8" fontFamily="monospace">MEMORIZE</text>
     </svg>
   )
 }
