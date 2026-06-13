@@ -35,7 +35,7 @@ export default function PerilousPathGame({ onExit }: { onExit: () => void }) {
   const scoreRef = useRef(0)
   const livesRef = useRef(3)
   const levelRef = useRef(1)
-  const timerRef = useRef<ReturnType<typeof setTimeout>>(0 as unknown as ReturnType<typeof setTimeout>>)
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(0 as unknown as ReturnType<typeof setTimeout>)
 
   const setupLevel = useCallback((lvl: number) => {
     const size = lvl >= 7 ? 7 : lvl >= 4 ? 6 : 5

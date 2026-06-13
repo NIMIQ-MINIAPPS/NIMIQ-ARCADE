@@ -43,7 +43,7 @@ export default function MiniSudokuGame({ onExit }: { onExit: () => void }) {
 
   const scoreRef = useRef(0)
   const levelRef = useRef(1)
-  const timerRef = useRef<ReturnType<typeof setInterval>>(0 as unknown as ReturnType<typeof setInterval>>)
+  const timerRef = useRef<ReturnType<typeof setInterval>>(0 as unknown as ReturnType<typeof setInterval>)
 
   const setupPuzzle = useCallback(() => {
     const { solution: sol, puzzle } = generateSudoku4()

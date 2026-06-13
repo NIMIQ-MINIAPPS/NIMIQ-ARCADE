@@ -51,8 +51,8 @@ export default function LowdownGame({ onExit }: { onExit: () => void }) {
   const scoreRef = useRef(0)
   const levelRef = useRef(1)
   const streakRef = useRef(0)
-  const gameTimer = useRef<ReturnType<typeof setInterval>>(0 as unknown as ReturnType<typeof setInterval>>)
-  const barTimer = useRef<ReturnType<typeof setInterval>>(0 as unknown as ReturnType<typeof setInterval>>)
+  const gameTimer = useRef<ReturnType<typeof setInterval>>(0 as unknown as ReturnType<typeof setInterval>)
+  const barTimer = useRef<ReturnType<typeof setInterval>>(0 as unknown as ReturnType<typeof setInterval>)
   const isRunning = useRef(false)
 
   const startBar = useCallback((time: number) => {

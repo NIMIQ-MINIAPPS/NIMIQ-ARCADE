@@ -34,7 +34,7 @@ export default function LowPopGame({ onExit }: { onExit: () => void }) {
 
   const scoreRef = useRef(0)
   const roundRef = useRef(1)
-  const timerRef = useRef<ReturnType<typeof setInterval>>(0 as unknown as ReturnType<typeof setInterval>>)
+  const timerRef = useRef<ReturnType<typeof setInterval>>(0 as unknown as ReturnType<typeof setInterval>)
   const isRunning = useRef(false)
 
   const startRound = useCallback((r: number) => {
