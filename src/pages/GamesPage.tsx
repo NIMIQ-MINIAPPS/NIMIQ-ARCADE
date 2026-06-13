@@ -16,6 +16,12 @@ import MemoryMatrixGame from '../games/matrix/MemoryMatrixGame'
 import NumberFlowGame from '../games/numberflow/NumberFlowGame'
 import PatternSyncGame from '../games/patternsync/PatternSyncGame'
 import BreakwallGame from '../games/breakwall/BreakwallGame'
+import LowdownGame from '../games/lowdown/LowdownGame'
+import WordFreshGame from '../games/wordfresh/WordFreshGame'
+import LowPopGame from '../games/lowpop/LowPopGame'
+import PerilousPathGame from '../games/perilous/PerilousPathGame'
+import GalaxyDefenderGame from '../games/galaxy/GalaxyDefenderGame'
+import MiniSudokuGame from '../games/sudoku/MiniSudokuGame'
 import { Lock, Star, Zap, ChevronRight } from 'lucide-react'
 
 const CAT_LABELS: Record<Exclude<GameCategory,'all'>, string> = {
@@ -124,21 +130,26 @@ export default function GamesPage() {
   const upcoming  = filtered.filter(g => !g.available)
 
   const renderGame = () => {
+    const exit = () => setActiveGame(null)
     switch (activeGame) {
-      case 'nimtris':       return <NimtrisGame  onExit={() => setActiveGame(null)} />
-      case 'hexfall':       return <HexfallGame  onExit={() => setActiveGame(null)} />
-      case 'memory-matrix': return <MemoryGame   onExit={() => setActiveGame(null)} />
-      case 'color-stroop':  return <MemoryGame   onExit={() => setActiveGame(null)} />
-      case 'memory':        return <MemoryGame   onExit={() => setActiveGame(null)} />
-      case 'quicktap':      return <QuickTapGame onExit={() => setActiveGame(null)} />
-      case 'runner':        return <RunnerGame   onExit={() => setActiveGame(null)} />
-      case 'snake-path':   return <SnakeGame    onExit={() => setActiveGame(null)} />
-      case 'tower-stack':  return <TowerStackGame onExit={() => setActiveGame(null)} />
-      case 'pong-duel':    return <PongGame     onExit={() => setActiveGame(null)} />
-      case 'memory-matrix':return <MemoryMatrixGame onExit={() => setActiveGame(null)} />
-      case 'number-flow':  return <NumberFlowGame onExit={() => setActiveGame(null)} />
-      case 'pattern-sync': return <PatternSyncGame onExit={() => setActiveGame(null)} />
-      case 'breakwall':    return <BreakwallGame onExit={() => setActiveGame(null)} />
+      case 'nimtris':        return <NimtrisGame onExit={exit} />
+      case 'hexfall':        return <HexfallGame onExit={exit} />
+      case 'memory':         return <MemoryGame onExit={exit} />
+      case 'quicktap':       return <QuickTapGame onExit={exit} />
+      case 'runner':         return <RunnerGame onExit={exit} />
+      case 'snake-path':     return <SnakeGame onExit={exit} />
+      case 'tower-stack':    return <TowerStackGame onExit={exit} />
+      case 'pong-duel':      return <PongGame onExit={exit} />
+      case 'memory-matrix':  return <MemoryMatrixGame onExit={exit} />
+      case 'number-flow':    return <NumberFlowGame onExit={exit} />
+      case 'pattern-sync':   return <PatternSyncGame onExit={exit} />
+      case 'breakwall':      return <BreakwallGame onExit={exit} />
+      case 'lowdown':        return <LowdownGame onExit={exit} />
+      case 'word-fresh':     return <WordFreshGame onExit={exit} />
+      case 'low-pop':        return <LowPopGame onExit={exit} />
+      case 'perilous-path':  return <PerilousPathGame onExit={exit} />
+      case 'galaxy-defender': return <GalaxyDefenderGame onExit={exit} />
+      case 'mini-sudoku':    return <MiniSudokuGame onExit={exit} />
       default: return null
     }
   }
@@ -149,9 +160,9 @@ export default function GamesPage() {
         {activeGame && (
           <motion.div
             key="game"
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}
-            className="fixed inset-0 z-40"
-            style={{ maxWidth: 430, left: '50%', transform: 'translateX(-50%)', background: '#0C0A06' }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 mx-auto"
+            style={{ maxWidth: 430, background: '#0C0A06' }}
           >
             {renderGame()}
           </motion.div>
