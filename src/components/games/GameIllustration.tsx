@@ -616,6 +616,38 @@ function LightBounce({ className }: IllProps) {
   )
 }
 
+function LowPop({ className }: IllProps) {
+  const R = 20
+  const hexPts = (cx: number, cy: number) =>
+    Array.from({ length: 6 }, (_, i) => {
+      const a = (Math.PI / 3) * i - Math.PI / 6
+      return `${(cx + (R - 1.5) * Math.cos(a)).toFixed(1)},${(cy + (R - 1.5) * Math.sin(a)).toFixed(1)}`
+    }).join(' ')
+
+  const hexes = [
+    { cx: 38,  cy: 30,  color: '#FFB3C6', num: '-7'  },
+    { cx: 122, cy: 26,  color: '#B3DCFF', num: '23'  },
+    { cx: 24,  cy: 76,  color: '#D4B3FF', num: '4'   },
+    { cx: 118, cy: 76,  color: '#B3F0D4', num: '-15' },
+    { cx: 72,  cy: 56,  color: '#FFD4B3', num: '61'  },
+  ]
+
+  return (
+    <svg viewBox="0 0 160 108" className={className}>
+      <rect width="160" height="108" fill="#FFF8E7" />
+      {hexes.map((h, i) => (
+        <g key={i}>
+          <polygon points={hexPts(h.cx, h.cy)} fill={h.color}
+            filter="drop-shadow(0 2px 5px rgba(0,0,0,0.10))" />
+          <text x={h.cx} y={h.cy + 4} textAnchor="middle"
+            fontSize={h.num.length > 3 ? '8' : '10'} fontWeight="900"
+            fill="#222" fontFamily="system-ui,sans-serif">{h.num}</text>
+        </g>
+      ))}
+    </svg>
+  )
+}
+
 function SumPath({ className }: IllProps) {
   const nums = [3,7,2,9,4,6,1,8,5,3,7,4,2,6,8,9]
   const path = [0,1,5,6,10,11,15]
@@ -671,6 +703,7 @@ const ILLUSTRATIONS: Record<string, React.ComponentType<IllProps>> = {
   'hex-flow':       HexFlow,
   'light-bounce':   LightBounce,
   'sum-path':       SumPath,
+  'low-pop':        LowPop,
 }
 
 export default function GameIllustration({ id, className }: { id: string; className?: string }) {
