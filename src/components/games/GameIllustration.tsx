@@ -547,20 +547,107 @@ function HexRunner({ className }: IllProps) {
 }
 
 function QuickTapIll({ className }: IllProps) {
-  const targets = [[38,28,20,'#D4A843'],[110,42,16,'#6A9BC4'],[68,70,24,'#7DB87A'],[130,80,14,'#9B7EC4']]
+  const HEX = (cx: number, cy: number, r: number) =>
+    Array.from({length:6},(_,i)=>{const a=Math.PI/3*i-Math.PI/6;return `${(cx+r*Math.cos(a)).toFixed(1)},${(cy+r*Math.sin(a)).toFixed(1)}`}).join(' ')
+  const targets = [
+    {cx:38, cy:28, r:16, col:'#FFB347', glow:true },
+    {cx:110,cy:38, r:13, col:'#86EFAC', glow:false},
+    {cx:65, cy:72, r:18, col:'#C4B5FD', glow:false},
+    {cx:130,cy:76, r:11, col:'#FCA5A5', glow:false},
+    {cx:92, cy:20, r:9,  col:'#7DD3FC', glow:false},
+  ]
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill={BG} />
-      {targets.map(([x,y,r,col],i)=>(
-        <g key={i}>
-          <circle cx={x as number} cy={y as number} r={(r as number)+4} fill={col as string} opacity=".12" />
-          <circle cx={x as number} cy={y as number} r={r as number} fill={col as string} opacity=".8" />
-          <HexPath cx={x as number} cy={y as number} r={8} fill="none" stroke={BG} />
+      <defs>
+        <linearGradient id="qt-bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#FFF8E8"/>
+          <stop offset="100%" stopColor="#FFF4E0"/>
+        </linearGradient>
+        <filter id="qt-glow"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      </defs>
+      <rect width="160" height="108" fill="url(#qt-bg)"/>
+      {targets.map((t,i)=>(
+        <g key={i} filter={t.glow?'url(#qt-glow)':undefined}>
+          <polygon points={HEX(t.cx,t.cy,t.r+5)} fill={t.col} opacity={0.18}/>
+          <polygon points={HEX(t.cx,t.cy,t.r)} fill={t.col} opacity={0.9}/>
+          <polygon points={HEX(t.cx,t.cy,t.r-4)} fill="rgba(255,255,255,0.25)"/>
         </g>
       ))}
-      {/* tap ripple */}
-      <circle cx="38" cy="28" r="28" fill="none" stroke={G} strokeWidth="1.5" opacity=".3" />
-      <circle cx="38" cy="28" r="38" fill="none" stroke={G} strokeWidth="0.8" opacity=".15" />
+      {/* tap ripple on first target */}
+      <polygon points={HEX(38,28,26)} fill="none" stroke="#FFB347" strokeWidth="1.5" opacity=".3"/>
+      <polygon points={HEX(38,28,34)} fill="none" stroke="#FFB347" strokeWidth="0.8" opacity=".15"/>
+      <text x="80" y="102" textAnchor="middle" fill="#C9A060" fontSize="7" fontFamily="system-ui,sans-serif" fontWeight="700" letterSpacing="1.5">TAP · REACT · REPEAT</text>
+    </svg>
+  )
+}
+
+function LowdownIll({ className }: IllProps) {
+  const cards = [
+    {x:22,  y:16, w:52, h:34, rot:-8,  expr:'14 + 27', col:'#FFF8E8'},
+    {x:100, y:12, w:52, h:34, rot:7,   expr:'83 - 19',  col:'#FFF0F5'},
+    {x:56,  y:55, w:56, h:36, rot:-2,  expr:'6 × 8',    col:'#F0FFF4'},
+  ]
+  return (
+    <svg viewBox="0 0 160 108" className={className}>
+      <defs>
+        <linearGradient id="ld-bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#FFF8E8"/><stop offset="100%" stopColor="#FFF4E0"/>
+        </linearGradient>
+        <filter id="ld-sh"><feDropShadow dx="0" dy="3" stdDeviation="4" floodColor="rgba(0,0,0,0.10)"/></filter>
+      </defs>
+      <rect width="160" height="108" fill="url(#ld-bg)"/>
+      {cards.map((c,i)=>(
+        <g key={i} transform={`rotate(${c.rot},${c.x+c.w/2},${c.y+c.h/2})`} filter="url(#ld-sh)">
+          <rect x={c.x} y={c.y} width={c.w} height={c.h} rx="6" fill={c.col} stroke="rgba(0,0,0,0.06)" strokeWidth="0.5"/>
+          <text x={c.x+c.w/2} y={c.y+c.h/2+4} textAnchor="middle" fontSize="11" fontWeight="900"
+            fill="#1A1A2E" fontFamily="system-ui,sans-serif">{c.expr}</text>
+        </g>
+      ))}
+      {/* HIGHER / LOWER buttons */}
+      <rect x="10" y="88" width="62" height="14" rx="7" fill="#80ED99" opacity="0.9"/>
+      <text x="41" y="98.5" textAnchor="middle" fontSize="7.5" fontWeight="900" fill="#14532D" fontFamily="system-ui,sans-serif">HIGHER ↑</text>
+      <rect x="88" y="88" width="62" height="14" rx="7" fill="#FFB5C2" opacity="0.9"/>
+      <text x="119" y="98.5" textAnchor="middle" fontSize="7.5" fontWeight="900" fill="#881337" fontFamily="system-ui,sans-serif">LOWER ↓</text>
+    </svg>
+  )
+}
+
+function GalaxyDefenderIll({ className }: IllProps) {
+  const HEX = (cx: number, cy: number, r: number) =>
+    Array.from({length:6},(_,i)=>{const a=Math.PI/3*i-Math.PI/6;return `${(cx+r*Math.cos(a)).toFixed(1)},${(cy+r*Math.sin(a)).toFixed(1)}`}).join(' ')
+  return (
+    <svg viewBox="0 0 160 108" className={className}>
+      <defs>
+        <radialGradient id="gd-bg" cx="50%" cy="50%">
+          <stop offset="0%" stopColor="#1E1B4B"/>
+          <stop offset="100%" stopColor="#0F0E26"/>
+        </radialGradient>
+        <filter id="gd-glow"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      </defs>
+      <rect width="160" height="108" fill="url(#gd-bg)"/>
+      {/* Stars */}
+      {[[12,8],[35,15],[55,5],[90,12],[118,8],[142,18],[28,42],[75,35],[132,38],[160,50],[8,65]].map(([x,y],i)=>(
+        <circle key={i} cx={x} cy={y} r={i%3===0?1.2:0.7} fill="white" opacity={0.3+i*0.04}/>
+      ))}
+      {/* Planet */}
+      <circle cx="132" cy="28" r="16" fill="#2A1F5E" opacity="0.9"/>
+      <ellipse cx="132" cy="28" rx="22" ry="5" fill="none" stroke="#7C6FCD" strokeWidth="1.5" opacity="0.6"/>
+      <circle cx="132" cy="28" r="16" fill="none" stroke="#4B3F9E" strokeWidth="0.5"/>
+      {/* Enemies */}
+      <polygon points="42,18 34,30 50,30" fill="#FF9F43" opacity="0.9"/>
+      <polygon points="80,12 72,24 88,24" fill="#C4B5FD" opacity="0.9"/>
+      <rect x="100" y="16" width="18" height="13" rx="3" fill="#FF6B6B" opacity="0.85"/>
+      {/* Bullets */}
+      <rect x="41" y="31" width="2" height="7" rx="1" fill="#4CC9F0" opacity="0.8"/>
+      <rect x="79" y="25" width="2" height="7" rx="1" fill="#4CC9F0" opacity="0.6"/>
+      {/* Player hex ship */}
+      <polygon points={HEX(80,84,14)} fill="#4CC9F0" filter="url(#gd-glow)"/>
+      <polygon points={HEX(80,84,8)} fill="rgba(255,255,255,0.2)"/>
+      {/* Engine glow */}
+      <ellipse cx="80" cy="97" rx="5" ry="7" fill="#86EFAC" opacity="0.7"/>
+      {/* Wings */}
+      <polygon points="66,84 56,94 68,90" fill="rgba(76,201,240,0.4)"/>
+      <polygon points="94,84 104,94 92,90" fill="rgba(76,201,240,0.4)"/>
     </svg>
   )
 }
@@ -863,6 +950,8 @@ const ILLUSTRATIONS: Record<string, React.ComponentType<IllProps>> = {
   'pong-duel':      PongDuel,
   runner:           HexRunner,
   quicktap:         QuickTapIll,
+  lowdown:          LowdownIll,
+  'galaxy-defender': GalaxyDefenderIll,
   'gravity-switch': GravitySwitch,
   'neon-blade':     NeonBlade,
   'dodge-storm':    DodgeStorm,
