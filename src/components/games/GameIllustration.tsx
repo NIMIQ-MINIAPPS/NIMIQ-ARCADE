@@ -123,30 +123,92 @@ function NumberFlow({ className }: IllProps) {
 }
 
 function PatternSync({ className }: IllProps) {
-  const items = [
-    {shape:'circle', color:'#93DCFF', cx:38, cy:30, r:16},
-    {shape:'hex',    color:'#C4B5FD', cx:122,cy:26, r:15},
-    {shape:'square', color:'#86EFAC', cx:30, cy:76, r:14},
-    {shape:'?',      color:'#FDBA74', cx:122,cy:76, r:15},
-  ]
   const hexPts = (cx: number, cy: number, r: number) =>
     Array.from({length:6},(_,i)=>{const a=Math.PI/3*i-Math.PI/6;return `${cx+r*Math.cos(a)},${cy+r*Math.sin(a)}`}).join(' ')
+  const items = [
+    {shape:'circle', color:'#9BF6FF', cx:36,  cy:32, r:16},
+    {shape:'hex',    color:'#C4B5FD', cx:124, cy:28, r:15},
+    {shape:'square', color:'#86EFAC', cx:32,  cy:76, r:14},
+    {shape:'tri',    color:'#FDBA74', cx:80,  cy:54, r:16},
+    {shape:'?',      color:'',        cx:124, cy:76, r:15},
+  ]
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill="#FFF9E8" />
-      <rect x={4} y={4} width={152} height={100} rx={10} fill="white" opacity={0.7}/>
+      <defs>
+        <linearGradient id="ps-bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#F0FFFE"/>
+          <stop offset="100%" stopColor="#FFF9E8"/>
+        </linearGradient>
+      </defs>
+      <rect width="160" height="108" fill="url(#ps-bg)"/>
+      <rect x={4} y={4} width={152} height={100} rx={12} fill="rgba(255,255,255,0.65)"/>
       {items.map((it,i) => (
-        <g key={i}>
-          {it.shape === 'circle' && <circle cx={it.cx} cy={it.cy} r={it.r} fill={it.color} opacity={0.9}/>}
-          {it.shape === 'square' && <rect x={it.cx-it.r} y={it.cy-it.r} width={it.r*2} height={it.r*2} rx={4} fill={it.color} opacity={0.9}/>}
-          {it.shape === 'hex'    && <polygon points={hexPts(it.cx,it.cy,it.r)} fill={it.color} opacity={0.9}/>}
-          {it.shape === '?' && <>
-            <rect x={it.cx-it.r} y={it.cy-it.r} width={it.r*2} height={it.r*2} rx={4}
-              fill="none" stroke="rgba(0,0,0,0.15)" strokeWidth={1.5} strokeDasharray="3,2"/>
-            <text x={it.cx} y={it.cy+5} textAnchor="middle" fontSize="14" fontWeight="900" fill="rgba(0,0,0,0.2)">?</text>
+        <g key={i} filter={it.shape!=='?'?'drop-shadow(0 2px 6px rgba(0,0,0,0.08))':''}>
+          {it.shape==='circle' && <circle cx={it.cx} cy={it.cy} r={it.r} fill={it.color} opacity={0.92}/>}
+          {it.shape==='square' && <rect x={it.cx-it.r} y={it.cy-it.r} width={it.r*2} height={it.r*2} rx={5} fill={it.color} opacity={0.92}/>}
+          {it.shape==='hex'    && <polygon points={hexPts(it.cx,it.cy,it.r)} fill={it.color} opacity={0.92}/>}
+          {it.shape==='tri'    && <polygon points={`${it.cx},${it.cy-it.r} ${it.cx+it.r*0.87},${it.cy+it.r*0.5} ${it.cx-it.r*0.87},${it.cy+it.r*0.5}`} fill={it.color} opacity={0.92}/>}
+          {it.shape==='?' && <>
+            <rect x={it.cx-it.r} y={it.cy-it.r} width={it.r*2} height={it.r*2} rx={5}
+              fill="rgba(155,246,255,0.12)" stroke="#9BF6FF" strokeWidth={1.8} strokeDasharray="3,2.5"/>
+            <text x={it.cx} y={it.cy+5} textAnchor="middle" fontSize="16" fontWeight="900"
+              fill="rgba(0,0,0,0.2)" fontFamily="system-ui,sans-serif">?</text>
           </>}
         </g>
       ))}
+    </svg>
+  )
+}
+
+function PerilousPathIll({ className }: IllProps) {
+  const hexPts = (cx: number, cy: number, r: number) =>
+    Array.from({length:6},(_,i)=>{const a=Math.PI/3*i-Math.PI/6;return `${cx+r*Math.cos(a)},${cy+r*Math.sin(a)}`}).join(' ')
+  const R = 13, COLS = 4, ROWS = 4
+  const sqrt3 = Math.sqrt(3)
+  const ox = (160 - ((COLS-1)*sqrt3*R + sqrt3/2*R + R*2)) / 2 + 2
+  const oy = (108 - ((ROWS-1)*1.5*R + R*2)) / 2 - 2
+  // Path: start(0,0) → (1,0) → (1,1) → (2,1) → (3,1) → end(3,3) ish
+  const pathSet = new Set(['0-0','1-0','1-1','2-1','3-1','3-2','3-3'])
+  const mineSet = new Set(['0-2','2-0','2-2','0-3'])
+  return (
+    <svg viewBox="0 0 160 108" className={className}>
+      <defs>
+        <linearGradient id="pp-bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#F0FFF8"/>
+          <stop offset="100%" stopColor="#E8F8FF"/>
+        </linearGradient>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="1.5" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <rect width="160" height="108" fill="url(#pp-bg)"/>
+      {Array.from({length:ROWS},(_,row) => Array.from({length:COLS},(__,col) => {
+        const cx = ox + col*sqrt3*R + (row%2)*sqrt3/2*R + R
+        const cy = oy + row*1.5*R + R
+        const key = `${row}-${col}`
+        const onPath = pathSet.has(key)
+        const isMine = mineSet.has(key)
+        const isStart = row===0 && col===0
+        const isEnd   = row===3 && col===3
+        return (
+          <g key={key}>
+            <polygon points={hexPts(cx,cy,R-1)}
+              fill={isStart?'#86EFAC' : isEnd?'#93DCFF' : onPath?'#A8E6CF' : isMine?'rgba(255,107,107,0.15)' : 'rgba(255,255,255,0.7)'}
+              stroke={onPath||isStart||isEnd ? '#A8E6CF' : isMine?'rgba(255,107,107,0.3)' : 'rgba(0,0,0,0.07)'}
+              strokeWidth={onPath||isStart||isEnd ? 1.5 : 1}
+              filter={onPath&&!isStart&&!isEnd ? 'url(#glow)' : ''}
+              opacity={0.95}
+            />
+            {isMine && <text x={cx} y={cy+4} textAnchor="middle" fontSize="8" fill="rgba(255,107,107,0.5)"
+              fontFamily="system-ui,sans-serif">×</text>}
+            {isStart && <text x={cx} y={cy+4} textAnchor="middle" fontSize="7" fontWeight="900" fill="#1A1A2E"
+              fontFamily="system-ui,sans-serif">A</text>}
+            {isEnd && <text x={cx} y={cy+4} textAnchor="middle" fontSize="7" fontWeight="900" fill="#1A1A2E"
+              fontFamily="system-ui,sans-serif">B</text>}
+          </g>
+        )
+      }))}
     </svg>
   )
 }
@@ -206,31 +268,47 @@ function WordFlux({ className }: IllProps) {
 
 // ── CLASSIC ARCADE ─────────────────────────────────────────────────────────
 function Nimtris({ className }: IllProps) {
-  const pastels = ['#93DCFF','#C4B5FD','#86EFAC','#FDBA74','#FCD34D','#F9A8D4','#67E8F9']
+  const pastels = ['#93DCFF','#C4B5FD','#86EFAC','#FDBA74','#FCD34D','#F9A8D4']
   const stack = [
-    [0,1,2,3,4,5],[6,0,1,2,3,4],[null,5,6,0,1,null],[null,null,2,3,null,null],
+    [0,1,2,3,4,5],
+    [5,0,1,2,3,4],
+    [null,4,5,0,1,null],
+    [null,null,1,2,null,null],
   ]
-  const S = 13, ox = 28, oy = 8
+  const BS = 13, ox = 26, oy = 6
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill="#FFF8E8" />
-      <rect x={ox-2} y={oy-2} width={6*S+4} height={4*S+4+40} rx={4} fill="white" opacity={0.7}/>
+      <defs>
+        <linearGradient id="nt-bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#4895EF" stopOpacity="0.18"/>
+          <stop offset="100%" stopColor="#C4B5FD" stopOpacity="0.22"/>
+        </linearGradient>
+      </defs>
+      <rect width="160" height="108" fill="#FFF8E8"/>
+      <rect width="160" height="108" fill="url(#nt-bg)"/>
+      {/* game board outline */}
+      <rect x={ox-3} y={oy-3} width={6*BS+6} height={4*BS+46} rx={6}
+        fill="rgba(255,255,255,0.6)" stroke="rgba(72,149,239,0.15)" strokeWidth="1.5"/>
       {/* stacked blocks */}
       {stack.map((row, ri) => row.map((ci, col) => ci !== null ? (
         <rect key={`${ri}-${col}`}
-          x={ox + col*S + 1} y={oy + (stack.length-1-ri)*S + 42}
-          width={S-2} height={S-2} rx={2}
-          fill={pastels[ci % pastels.length]} opacity={0.9}
+          x={ox+col*BS+1} y={oy+(stack.length-1-ri)*BS+44}
+          width={BS-2} height={BS-2} rx={2.5}
+          fill={pastels[ci % pastels.length]} opacity={0.92}
         />
       ) : null))}
-      {/* falling I-piece */}
+      {/* falling I-piece (4 wide, cyan) */}
       {[0,1,2,3].map(i => (
-        <rect key={i} x={ox+i*S+1} y={oy+4} width={S-2} height={S-2} rx={2} fill="#93DCFF" opacity={0.95}/>
+        <g key={i}>
+          <rect x={ox+i*BS+1} y={oy+6} width={BS-2} height={BS-2} rx={2.5} fill="#4895EF" opacity={0.95}/>
+          {/* highlight */}
+          <rect x={ox+i*BS+2} y={oy+7} width={BS-4} height={4} rx={1} fill="rgba(255,255,255,0.35)"/>
+        </g>
       ))}
-      {/* speed lines */}
+      {/* speed lines above piece */}
       {[0,1,2,3].map(i => (
-        <line key={i} x1={ox+i*S+(S/2)} y1={oy} x2={ox+i*S+(S/2)} y2={oy+2}
-          stroke="#93DCFF" strokeWidth={1.5} opacity={0.5}/>
+        <line key={i} x1={ox+i*BS+BS/2} y1={oy} x2={ox+i*BS+BS/2} y2={oy+4}
+          stroke="#4895EF" strokeWidth={1.5} opacity={0.4}/>
       ))}
     </svg>
   )
@@ -238,29 +316,45 @@ function Nimtris({ className }: IllProps) {
 
 function HexFallIll({ className }: IllProps) {
   const PASTELS = ['#86EFAC','#C4B5FD','#93DCFF','#FCA5A5','#FDBA74']
-  const R = 11, COLS = 5, ROWS = 4
+  const R = 12, COLS = 5, ROWS = 4
   const sqrt3 = Math.sqrt(3)
   const pxW = (COLS - 1) * sqrt3 * R + sqrt3/2 * R + R*2
   const pxH = (ROWS - 1) * 1.5 * R + R * 2
-  const ox = (160 - pxW) / 2, oy = (108 - pxH) / 2 - 4
+  const ox = (160 - pxW) / 2 + 4, oy = (108 - pxH) / 2 - 6
   const hexPts = (cx: number, cy: number, r: number) =>
     Array.from({length:6},(_,i)=>{const a=Math.PI/3*i-Math.PI/6;return `${cx+r*Math.cos(a)},${cy+r*Math.sin(a)}`}).join(' ')
+  // Cells to "explode" (removed group)
+  const exploding = new Set(['1-2','1-3','2-2','2-3'])
+  // Particle positions around exploding group center
+  const particles = [{x:95,y:35},{x:108,y:28},{x:112,y:44},{x:88,y:24},{x:100,y:48}]
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill="#FFF9E8" />
-      <rect x={4} y={4} width={152} height={100} rx={10} fill="white" opacity={0.65}/>
+      <defs>
+        <radialGradient id="hf-bg" cx="50%" cy="40%">
+          <stop offset="0%" stopColor="#F0FFF4"/>
+          <stop offset="100%" stopColor="#FFF9E8"/>
+        </radialGradient>
+      </defs>
+      <rect width="160" height="108" fill="url(#hf-bg)"/>
+      <rect x={4} y={4} width={152} height={100} rx={12} fill="rgba(255,255,255,0.55)"/>
       {Array.from({length: ROWS}, (_,row) => Array.from({length: COLS}, (__,col) => {
         const cx = ox + col * sqrt3 * R + (row % 2) * sqrt3/2 * R + R
         const cy = oy + row * 1.5 * R + R
-        const skip = row === 0 && col === 2
-        return !skip ? (
-          <polygon key={`${row}${col}`} points={hexPts(cx,cy,R-1.5)}
-            fill={PASTELS[(row*COLS+col)%PASTELS.length]} opacity={0.88}/>
-        ) : (
-          <polygon key={`${row}${col}`} points={hexPts(cx,cy,R-1.5)}
-            fill="none" stroke="rgba(0,0,0,0.12)" strokeWidth={1} strokeDasharray="2,2"/>
-        )
+        const key = `${row}-${col}`
+        const isExploding = exploding.has(key)
+        return !isExploding ? (
+          <polygon key={key} points={hexPts(cx,cy,R-1.5)}
+            fill={PASTELS[(row*COLS+col)%PASTELS.length]} opacity={0.9}/>
+        ) : null
       }))}
+      {/* explosion particles */}
+      {particles.map((p,i) => (
+        <polygon key={i} points={hexPts(p.x, p.y, 5+i%3*2)}
+          fill={PASTELS[i % PASTELS.length]} opacity={0.7+(i%3)*0.1}/>
+      ))}
+      {/* COMBO flash text */}
+      <text x="80" y="96" textAnchor="middle" fontSize="9" fontWeight="900"
+        fill="#80ED99" fontFamily="system-ui,sans-serif" letterSpacing="2" opacity="0.85">COMBO ×3</text>
     </svg>
   )
 }
@@ -412,25 +506,42 @@ function PongDuel({ className }: IllProps) {
 
 // ── ACTION ─────────────────────────────────────────────────────────────────
 function HexRunner({ className }: IllProps) {
-  const obstacles = [[90,70,18,30],[115,70,18,42],[140,70,18,24]]
+  const hexPts = (cx: number, cy: number, r: number) =>
+    Array.from({length:6},(_,i)=>{const a=Math.PI/3*i-Math.PI/6;return `${cx+r*Math.cos(a)},${cy+r*Math.sin(a)}`}).join(' ')
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill={BG} />
+      <defs>
+        <linearGradient id="runner-sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#FFF9E0"/>
+          <stop offset="100%" stopColor="#FFF3C0"/>
+        </linearGradient>
+      </defs>
+      <rect width="160" height="108" fill="url(#runner-sky)"/>
+      {/* clouds */}
+      <ellipse cx="38" cy="18" rx="18" ry="7" fill="white" opacity="0.85"/>
+      <ellipse cx="52" cy="14" rx="12" ry="8" fill="white" opacity="0.85"/>
+      <ellipse cx="24" cy="15" rx="10" ry="6" fill="white" opacity="0.85"/>
+      <ellipse cx="118" cy="22" rx="14" ry="6" fill="white" opacity="0.7"/>
+      <ellipse cx="130" cy="18" rx="10" ry="7" fill="white" opacity="0.7"/>
+      {/* rolling hills */}
+      <path d="M0,82 Q20,68 45,74 Q70,80 90,70 Q110,60 130,68 Q148,74 160,70 L160,108 L0,108 Z"
+        fill="#FDBA74" opacity="0.35"/>
       {/* ground */}
-      <rect x="0" y="88" width="160" height="20" fill={S} />
-      <rect x="0" y="86" width="160" height="3" fill={G} opacity=".4" />
+      <rect x="0" y="84" width="160" height="24" fill="#FFD166"/>
+      <rect x="0" y="84" width="160" height="2" fill="#FFB830"/>
       {/* speed lines */}
-      {[18,28,38,48,58].map((y,i)=>(
-        <line key={i} x1="0" y1={y} x2={30+i*8} y2={y} stroke={DIM} strokeWidth="0.8" opacity=".4" />
+      {[30,40,50,60].map((y,i)=>(
+        <line key={i} x1="0" y1={y} x2={18+i*6} y2={y} stroke="rgba(255,193,80,0.4)" strokeWidth="1.2"/>
       ))}
       {/* obstacles */}
-      {obstacles.map(([x,y,w,h],i)=>(
-        <rect key={i} x={x} y={y} width={w} height={h} rx="2"
-          fill={[G,'#9B7EC4','#6A9BC4'][i]} opacity=".7" />
-      ))}
-      {/* player */}
-      <rect x="30" y="60" width="22" height="28" rx="3" fill={G} />
-      <circle cx="41" cy="56" r="8" fill={C} />
+      <rect x="96" y="64" width="16" height="20" rx="3" fill="#FF6B6B" opacity="0.9"/>
+      <rect x="128" y="56" width="16" height="28" rx="3" fill="#FF6B6B" opacity="0.9"/>
+      {/* player hex jumping */}
+      <polygon points={hexPts(50,52,13)} fill="#4CC9F0"/>
+      <polygon points={hexPts(50,52,13)} fill="rgba(255,255,255,0.2)"
+        clipPath="polygon(0 0, 100% 0, 100% 45%, 0 45%)"/>
+      {/* jump arc suggestion */}
+      <path d="M36,78 Q50,38 64,58" stroke="#4CC9F0" strokeWidth="1.2" fill="none" strokeDasharray="3,3" opacity="0.5"/>
     </svg>
   )
 }
@@ -532,29 +643,43 @@ function TowerStack({ className }: IllProps) {
 
 // ── PUZZLE ─────────────────────────────────────────────────────────────────
 function MemoryRush({ className }: IllProps) {
-  const cards = Array.from({length:12},(_,i) => ({
-    flipped: [1,4,7,10].includes(i),
-    emoji: i%2===0?'hex':'star',
-    color: i%4<2?G:C,
-  }))
+  // Floating cards at angles, colorful
+  const cards = [
+    { x:18,  y:14, rot:-12, color:'#FF6B6B',  sym:'★', matched:true  },
+    { x:64,  y:8,  rot:5,   color:'#C4B5FD',  sym:'◆', matched:false },
+    { x:108, y:12, rot:-6,  color:'#86EFAC',  sym:'⬡', matched:true  },
+    { x:140, y:20, rot:14,  color:'#FCD34D',  sym:'●', matched:false },
+    { x:10,  y:58, rot:8,   color:'#C4B5FD',  sym:'◆', matched:true  },
+    { x:52,  y:52, rot:-10, color:'#FF6B6B',  sym:'★', matched:true  },
+    { x:96,  y:56, rot:7,   color:'#FCA5A5',  sym:'▲', matched:false },
+    { x:134, y:60, rot:-8,  color:'#86EFAC',  sym:'⬡', matched:false },
+  ]
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill={BG} />
-      {cards.map((card,i)=>{
-        const col=i%4, row=Math.floor(i/4)
-        return (
-          <g key={i}>
-            <rect x={8+col*36} y={8+row*30} width="30" height="24" rx="4"
-              fill={card.flipped?'#201C15':S} stroke={card.flipped?G:DIM} strokeWidth={card.flipped?1.5:0.8} />
-            {card.flipped && (
-              <HexPath cx={23+col*36} cy={20+row*30} r={7} fill={card.color} />
-            )}
-          </g>
-        )
-      })}
-      {/* timer bar */}
-      <rect x="20" y="98" width="120" height="6" rx="3" fill={S} />
-      <rect x="20" y="98" width="75" height="6" rx="3" fill={G} />
+      <defs>
+        <linearGradient id="mr-bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#F8F0FF"/>
+          <stop offset="100%" stopColor="#FFF0FF"/>
+        </linearGradient>
+      </defs>
+      <rect width="160" height="108" fill="url(#mr-bg)"/>
+      {cards.map((c,i) => (
+        <g key={i} transform={`rotate(${c.rot},${c.x+14},${c.y+18})`}>
+          <rect x={c.x} y={c.y} width="28" height="36" rx="5"
+            fill={c.matched ? c.color : 'white'}
+            stroke={c.matched ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.1)'}
+            strokeWidth="1"
+            filter={c.matched ? 'drop-shadow(0 2px 6px rgba(0,0,0,0.1))' : 'drop-shadow(0 1px 3px rgba(0,0,0,0.07))'}
+            opacity={0.92}
+          />
+          <text x={c.x+14} y={c.y+23} textAnchor="middle" fontSize="13" fontWeight="900"
+            fill={c.matched ? 'white' : 'rgba(0,0,0,0.18)'}
+            fontFamily="system-ui,sans-serif">{c.matched ? c.sym : '⬡'}</text>
+        </g>
+      ))}
+      {/* Match glow */}
+      <text x="80" y="100" textAnchor="middle" fontSize="8" fontWeight="800"
+        fill="#C4B5FD" fontFamily="system-ui,sans-serif" letterSpacing="2" opacity="0.8">MATCH!</text>
     </svg>
   )
 }
@@ -660,31 +785,33 @@ function LightBounce({ className }: IllProps) {
 }
 
 function LowPop({ className }: IllProps) {
-  const R = 20
-  const hexPts = (cx: number, cy: number) =>
-    Array.from({ length: 6 }, (_, i) => {
-      const a = (Math.PI / 3) * i - Math.PI / 6
-      return `${(cx + (R - 1.5) * Math.cos(a)).toFixed(1)},${(cy + (R - 1.5) * Math.sin(a)).toFixed(1)}`
-    }).join(' ')
+  const hexPts = (cx: number, cy: number, r: number) =>
+    Array.from({length:6},(_,i)=>{const a=Math.PI/3*i-Math.PI/6;return `${(cx+(r-1)*Math.cos(a)).toFixed(1)},${(cy+(r-1)*Math.sin(a)).toFixed(1)}`}).join(' ')
 
   const hexes = [
-    { cx: 38,  cy: 30,  color: '#FFB3C6', num: '-7'  },
-    { cx: 122, cy: 26,  color: '#B3DCFF', num: '23'  },
-    { cx: 24,  cy: 76,  color: '#D4B3FF', num: '4'   },
-    { cx: 118, cy: 76,  color: '#B3F0D4', num: '-15' },
-    { cx: 72,  cy: 56,  color: '#FFD4B3', num: '61'  },
+    { cx:34,  cy:30, r:22, color:'#FFB5C2', num:'-12', rot:-8  },
+    { cx:120, cy:24, r:20, color:'#BDE0FE', num:'47',  rot:6   },
+    { cx:22,  cy:78, r:18, color:'#D4B3FF', num:'3',   rot:-5  },
+    { cx:118, cy:78, r:20, color:'#B3F0D4', num:'99',  rot:10  },
+    { cx:74,  cy:54, r:24, color:'#FFD4B3', num:'-7',  rot:-3  },
   ]
 
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill="#FFF8E7" />
-      {hexes.map((h, i) => (
-        <g key={i}>
-          <polygon points={hexPts(h.cx, h.cy)} fill={h.color}
-            filter="drop-shadow(0 2px 5px rgba(0,0,0,0.10))" />
-          <text x={h.cx} y={h.cy + 4} textAnchor="middle"
-            fontSize={h.num.length > 3 ? '8' : '10'} fontWeight="900"
-            fill="#222" fontFamily="system-ui,sans-serif">{h.num}</text>
+      <defs>
+        <linearGradient id="lp-bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#FFF5F7"/>
+          <stop offset="100%" stopColor="#FFF8E7"/>
+        </linearGradient>
+      </defs>
+      <rect width="160" height="108" fill="url(#lp-bg)"/>
+      {hexes.map((h,i) => (
+        <g key={i} transform={`rotate(${h.rot},${h.cx},${h.cy})`}
+          filter="drop-shadow(0 3px 7px rgba(0,0,0,0.10))">
+          <polygon points={hexPts(h.cx,h.cy,h.r)} fill={h.color} opacity={0.9}/>
+          <text x={h.cx} y={h.cy+4} textAnchor="middle"
+            fontSize={h.num.length>3?'8':'11'} fontWeight="900"
+            fill="#1A1A2E" fontFamily="system-ui,sans-serif" opacity={0.85}>{h.num}</text>
         </g>
       ))}
     </svg>
@@ -721,6 +848,7 @@ const ILLUSTRATIONS: Record<string, React.ComponentType<IllProps>> = {
   'color-stroop':   ColorStroop,
   'number-flow':    NumberFlow,
   'pattern-sync':   PatternSync,
+  'perilous-path':  PerilousPathIll,
   'focus-grid':     FocusGrid,
   'speed-sort':     SpeedSort,
   'word-flux':      WordFlux,
