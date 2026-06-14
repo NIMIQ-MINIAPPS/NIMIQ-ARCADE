@@ -123,20 +123,30 @@ function NumberFlow({ className }: IllProps) {
 }
 
 function PatternSync({ className }: IllProps) {
-  const shapes = [
-    { d: 'M50,20 L65,44 L35,44Z', fill: G },
-    { d: 'M90,22 L108,22 L108,40 L90,40Z', fill: C },
-    { d: 'M130,31 m-10,0 a10,10 0 1,0 20,0 a10,10 0 1,0 -20,0', fill: G },
-    { d: 'M50,62 L65,62 L58,78Z', fill: DIM },
-    { d: 'M90,60 L100,70 L80,70Z', fill: '?' },
+  const items = [
+    {shape:'circle', color:'#93DCFF', cx:38, cy:30, r:16},
+    {shape:'hex',    color:'#C4B5FD', cx:122,cy:26, r:15},
+    {shape:'square', color:'#86EFAC', cx:30, cy:76, r:14},
+    {shape:'?',      color:'#FDBA74', cx:122,cy:76, r:15},
   ]
+  const hexPts = (cx: number, cy: number, r: number) =>
+    Array.from({length:6},(_,i)=>{const a=Math.PI/3*i-Math.PI/6;return `${cx+r*Math.cos(a)},${cy+r*Math.sin(a)}`}).join(' ')
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill={BG} />
-      {shapes.slice(0,3).map((s,i) => <path key={i} d={s.d} fill={s.fill} opacity=".9" />)}
-      <path d="M35,52 L65,52 L65,80 L35,80Z" fill="none" stroke={G} strokeWidth="1.5" strokeDasharray="3,2" />
-      <text x="50" y="70" textAnchor="middle" fill={G} fontSize="16" fontWeight="bold">?</text>
-      <text x="80" y="102" textAnchor="middle" fill={DIM} fontSize="7" fontFamily="monospace">COMPLETE THE SEQUENCE</text>
+      <rect width="160" height="108" fill="#FFF9E8" />
+      <rect x={4} y={4} width={152} height={100} rx={10} fill="white" opacity={0.7}/>
+      {items.map((it,i) => (
+        <g key={i}>
+          {it.shape === 'circle' && <circle cx={it.cx} cy={it.cy} r={it.r} fill={it.color} opacity={0.9}/>}
+          {it.shape === 'square' && <rect x={it.cx-it.r} y={it.cy-it.r} width={it.r*2} height={it.r*2} rx={4} fill={it.color} opacity={0.9}/>}
+          {it.shape === 'hex'    && <polygon points={hexPts(it.cx,it.cy,it.r)} fill={it.color} opacity={0.9}/>}
+          {it.shape === '?' && <>
+            <rect x={it.cx-it.r} y={it.cy-it.r} width={it.r*2} height={it.r*2} rx={4}
+              fill="none" stroke="rgba(0,0,0,0.15)" strokeWidth={1.5} strokeDasharray="3,2"/>
+            <text x={it.cx} y={it.cy+5} textAnchor="middle" fontSize="14" fontWeight="900" fill="rgba(0,0,0,0.2)">?</text>
+          </>}
+        </g>
+      ))}
     </svg>
   )
 }
@@ -227,34 +237,58 @@ function Nimtris({ className }: IllProps) {
 }
 
 function HexFallIll({ className }: IllProps) {
-  const colors = [G, C, '#7DB87A', '#9B7EC4', '#6A9BC4', G, C, '#C46B5A', G, C, '#7DB87A', C, G, C, '#6A9BC4', G, C, G, '#9B7EC4', C]
+  const PASTELS = ['#86EFAC','#C4B5FD','#93DCFF','#FCA5A5','#FDBA74']
+  const R = 11, COLS = 5, ROWS = 4
+  const sqrt3 = Math.sqrt(3)
+  const pxW = (COLS - 1) * sqrt3 * R + sqrt3/2 * R + R*2
+  const pxH = (ROWS - 1) * 1.5 * R + R * 2
+  const ox = (160 - pxW) / 2, oy = (108 - pxH) / 2 - 4
+  const hexPts = (cx: number, cy: number, r: number) =>
+    Array.from({length:6},(_,i)=>{const a=Math.PI/3*i-Math.PI/6;return `${cx+r*Math.cos(a)},${cy+r*Math.sin(a)}`}).join(' ')
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill={BG} />
-      {Array.from({ length: 20 }, (_, i) => {
-        const col = i % 5, row = Math.floor(i / 5)
-        return (
-          <rect key={i} x={18+col*26} y={12+row*22} width="22" height="18" rx="3"
-            fill={colors[i]} opacity={row === 0 && [1,3].includes(col) ? 0 : .7} />
+      <rect width="160" height="108" fill="#FFF9E8" />
+      <rect x={4} y={4} width={152} height={100} rx={10} fill="white" opacity={0.65}/>
+      {Array.from({length: ROWS}, (_,row) => Array.from({length: COLS}, (__,col) => {
+        const cx = ox + col * sqrt3 * R + (row % 2) * sqrt3/2 * R + R
+        const cy = oy + row * 1.5 * R + R
+        const skip = row === 0 && col === 2
+        return !skip ? (
+          <polygon key={`${row}${col}`} points={hexPts(cx,cy,R-1.5)}
+            fill={PASTELS[(row*COLS+col)%PASTELS.length]} opacity={0.88}/>
+        ) : (
+          <polygon key={`${row}${col}`} points={hexPts(cx,cy,R-1.5)}
+            fill="none" stroke="rgba(0,0,0,0.12)" strokeWidth={1} strokeDasharray="2,2"/>
         )
-      })}
-      {/* cleared line flash */}
-      <rect x="16" y="55" width="128" height="20" rx="3" fill={GB} opacity=".12" />
-      <text x="80" y="100" textAnchor="middle" fill={DIM} fontSize="7" fontFamily="monospace">TAP GROUPS TO CLEAR</text>
+      }))}
     </svg>
   )
 }
 
 function SnakePath({ className }: IllProps) {
+  const segs = [{x:7,y:4},{x:6,y:4},{x:5,y:4},{x:5,y:5},{x:5,y:6},{x:6,y:6},{x:7,y:6},{x:8,y:6}]
+  const CELL = 14
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill={BG} />
-      <path d="M20,54 H80 V20 H130 V54 H100 V80 H50 V60"
-        stroke={G} strokeWidth="8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="48" cy="60" r="7" fill={GB} />
-      <circle cx="50" cy="57" r="2" fill={BG} />
+      <rect width="160" height="108" fill="#FFF9E8" />
+      <rect x={4} y={4} width={152} height={100} rx={10} fill="white" opacity={0.7}/>
+      {segs.map((seg,i) => {
+        const t = 1 - i/segs.length
+        const isHead = i === 0
+        return (
+          <rect key={i}
+            x={seg.x*CELL+8} y={seg.y*CELL+14}
+            width={CELL-2} height={CELL-2} rx={isHead?5:4}
+            fill={`rgba(82,214,129,${0.35+t*0.65})`}
+          />
+        )
+      })}
+      {/* eyes on head */}
+      <circle cx={segs[0].x*CELL+8+CELL-3} cy={segs[0].y*CELL+14+4} r={1.5} fill="#1A1A2E"/>
+      <circle cx={segs[0].x*CELL+8+CELL-3} cy={segs[0].y*CELL+14+CELL-5} r={1.5} fill="#1A1A2E"/>
       {/* food */}
-      <circle cx="110" cy="90" r="5" fill={C} opacity=".7" />
+      <circle cx={12*CELL+8+CELL/2} cy={4*CELL+14+CELL/2} r={6} fill="#FF6B6B" opacity={0.9}/>
+      <circle cx={12*CELL+6+CELL/2} cy={4*CELL+12+CELL/2} r={1.5} fill="rgba(255,255,255,0.6)"/>
     </svg>
   )
 }
