@@ -1,154 +1,303 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
+import { motion } from 'framer-motion'
 import { useGameStore } from '../../store/useGameStore'
-import { getGameTheme } from '../../lib/gameThemes'
-import { GameShell, StartOverlay, GameOverOverlay } from '../../components/games/GameShell'
 
-const T = getGameTheme('runner')
-const W = 380, H = 480, GRAVITY = 0.6, JUMP = -13, GROUND = H - 80
+const BG = '#FFF8E8'
+const W = 380, H = 400
+const GRAVITY = 0.65, JUMP = -13, GROUND = H - 48
+const PX = 60, PR = 16
+const SPEED_INIT = 4, SPEED_MAX = 11
+const PC = '#4CC9F0'   // player cyan
+const GC = '#FFD166'   // ground yellow
+
+function obstacleColor(dist: number): string {
+  if (dist < 500)  return '#FF6B6B'
+  if (dist < 1000) return '#FF9F43'
+  if (dist < 1500) return '#FDBA74'
+  if (dist < 2000) return '#F4A261'
+  return ['#FF6B6B','#C4B5FD','#86EFAC'][Math.floor(dist/2000) % 3]
+}
+
+type OData = { x: number; w: number; h: number; color: string }
+type Coin  = { x: number; y: number; collected: boolean }
+
+function genGroup(dist: number): OData[] {
+  const c = obstacleColor(dist)
+  const r = Math.random
+  if (dist < 500)  return [{ x:W+10, w:26, h:35+r()*40, color:c }]
+  if (dist < 1000) return r()<0.4
+    ? [{ x:W+10,w:23,h:35+r()*40,color:c },{ x:W+42,w:23,h:35+r()*55,color:c }]
+    : [{ x:W+10,w:26,h:40+r()*55,color:c }]
+  if (dist < 1500) return r()<0.45
+    ? [{ x:W+10,w:22,h:50+r()*60,color:c },{ x:W+42,w:22,h:30+r()*40,color:c }]
+    : [{ x:W+10,w:26,h:55+r()*65,color:c }]
+  if (dist < 2000) {
+    const n = r()<0.4 ? 3 : 2
+    return Array.from({length:n},(_,i)=>({ x:W+10+i*36,w:22,h:40+r()*55,color:c }))
+  }
+  const roll = r()
+  if (roll < 0.33) return [
+    { x:W+10,w:22,h:60+r()*55,color:c },
+    { x:W+44,w:22,h:35+r()*35,color:c },
+    { x:W+140+r()*40,w:22,h:60+r()*55,color:c },
+  ]
+  if (roll < 0.66) return [
+    { x:W+10,w:22,h:80+r()*35,color:c },
+    { x:W+44,w:22,h:35+r()*30,color:c },
+    { x:W+78,w:22,h:80+r()*35,color:c },
+  ]
+  return Array.from({length:3},(_,i)=>({ x:W+10+i*36,w:20,h:45+r()*65,color:c }))
+}
+
+function hexPts(cx:number,cy:number,r:number){ return Array.from({length:6},(_,i)=>{ const a=(Math.PI/3)*i-Math.PI/6; return `${cx+r*Math.cos(a)},${cy+r*Math.sin(a)}` }).join(' ') }
+
+function drawHex(ctx:CanvasRenderingContext2D,cx:number,cy:number,r:number,col:string,a=1){
+  ctx.globalAlpha=a; ctx.fillStyle=col; ctx.beginPath()
+  for(let i=0;i<6;i++){ const ang=(Math.PI/3)*i-Math.PI/6; if(i===0) ctx.moveTo(cx+r*Math.cos(ang),cy+r*Math.sin(ang)); else ctx.lineTo(cx+r*Math.cos(ang),cy+r*Math.sin(ang)) }
+  ctx.closePath(); ctx.fill(); ctx.globalAlpha=1
+}
+
+let _ac: AudioContext|null=null
+function snd(type:'jump'|'coin'|'doom'){
+  try{
+    if(!_ac) _ac=new (window.AudioContext||(window as any).webkitAudioContext)()
+    const c=_ac,t=c.currentTime
+    const n=(f:number,at:number,dur:number,vol:number,osc:OscillatorType='sine')=>{
+      const o=c.createOscillator(),g=c.createGain(); o.type=osc; o.frequency.setValueAtTime(f,at)
+      g.gain.setValueAtTime(vol,at); g.gain.exponentialRampToValueAtTime(0.001,at+dur)
+      o.connect(g); g.connect(c.destination); o.start(at); o.stop(at+dur)
+    }
+    if(type==='jump') { n(440,t,0.08,0.07,'triangle'); n(550,t+0.04,0.06,0.05) }
+    if(type==='coin') [880,1100].forEach((f,i)=>n(f,t+i*0.05,0.08,0.08))
+    if(type==='doom') { n(180,t,0.4,0.18,'sawtooth'); n(130,t+0.3,0.4,0.14,'square') }
+  } catch{/**/}
+}
 
 export default function RunnerGame({ onExit }: { onExit: () => void }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
   const { addXp, setHighScore, highScores } = useGameStore()
-  const [gameOver, setGameOver] = useState(false)
-  const [dist, setDist] = useState(0)
-  const [started, setStarted] = useState(false)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
 
-  const player = useRef({ y: GROUND - 24, vy: 0, jumps: 0 })
-  const obstacles = useRef<{ x: number; w: number; h: number }[]>([])
-  const distRef = useRef(0)
-  const speedRef = useRef(4)
-  const animRef = useRef(0)
-  const isRunning = useRef(false)
+  const [phase, setPhase] = useState<'start'|'play'|'over'>('start')
+  const [distDisp,  setDistDisp]  = useState(0)
+  const [scoreDisp, setScoreDisp] = useState(0)
 
-  const draw = useCallback(() => {
-    const ctx = canvasRef.current?.getContext('2d')
-    if (!ctx) return
-    const dpr = window.devicePixelRatio || 1
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-
-    const grad = ctx.createLinearGradient(0, 0, 0, H)
-    grad.addColorStop(0, '#0C1020')
-    grad.addColorStop(1, T.bg)
-    ctx.fillStyle = grad
-    ctx.fillRect(0, 0, W, H)
-
-    ctx.strokeStyle = `${T.accent}50`
-    ctx.lineWidth = 1
-    ctx.beginPath(); ctx.moveTo(0, GROUND); ctx.lineTo(W, GROUND); ctx.stroke()
-
-    const p = player.current
-    ctx.save()
-    ctx.translate(60, p.y)
-    ctx.fillStyle = T.accent
-    ctx.beginPath()
-    ctx.moveTo(14, 0); ctx.lineTo(28, 7); ctx.lineTo(28, 17)
-    ctx.lineTo(14, 24); ctx.lineTo(0, 17); ctx.lineTo(0, 7)
-    ctx.closePath(); ctx.fill()
-    ctx.fillStyle = 'rgba(255,255,255,0.15)'
-    ctx.beginPath()
-    ctx.moveTo(14, 0); ctx.lineTo(28, 7); ctx.lineTo(14, 14); ctx.lineTo(0, 7)
-    ctx.closePath(); ctx.fill()
-    ctx.restore()
-
-    ctx.fillStyle = '#1F2348'
-    obstacles.current.forEach(o => {
-      ctx.fillRect(o.x, GROUND - o.h, o.w, o.h)
-      ctx.strokeStyle = '#2E3565'
-      ctx.strokeRect(o.x, GROUND - o.h, o.w, o.h)
-    })
-
-    ctx.fillStyle = T.hudText
-    ctx.font = 'bold 16px system-ui'
-    ctx.textAlign = 'right'
-    ctx.fillText(`${Math.floor(distRef.current)}m`, W - 16, 28)
-  }, [])
-
-  const gameLoop = useCallback(() => {
-    if (!isRunning.current) return
-    const p = player.current
-    p.vy += GRAVITY; p.y += p.vy
-    if (p.y >= GROUND - 24) { p.y = GROUND - 24; p.vy = 0; p.jumps = 0 }
-
-    speedRef.current = Math.min(10, 4 + distRef.current / 200)
-    distRef.current += speedRef.current / 10
-    setDist(Math.floor(distRef.current))
-
-    if (obstacles.current.length === 0 || obstacles.current[obstacles.current.length - 1].x < W - 200) {
-      if (Math.random() < 0.03) {
-        obstacles.current.push({ x: W, w: 30 + Math.random() * 20, h: 30 + Math.random() * 60 })
-      }
-    }
-    obstacles.current.forEach(o => { o.x -= speedRef.current })
-    obstacles.current = obstacles.current.filter(o => o.x + o.w > -10)
-
-    const px = 60, py = p.y, pw = 28, ph = 24
-    for (const o of obstacles.current) {
-      if (px + pw > o.x && px < o.x + o.w && py + ph > GROUND - o.h) {
-        isRunning.current = false
-        addXp(Math.floor(distRef.current))
-        setHighScore('runner', Math.floor(distRef.current))
-        setDist(Math.floor(distRef.current))
-        setGameOver(true)
-        draw()
-        return
-      }
-    }
-    draw()
-    animRef.current = requestAnimationFrame(gameLoop)
-  }, [draw, addXp, setHighScore])
+  const pY    = useRef(GROUND-PR), pVY = useRef(0), pJ = useRef(0)
+  const spd   = useRef(SPEED_INIT), dist = useRef(0), sc = useRef(0)
+  const obs   = useRef<OData[]>([]), coins = useRef<Coin[]>([])
+  const lastCoin = useRef(0), coinFlash = useRef(0)
+  const alive = useRef(false), raf = useRef(0)
 
   const jump = useCallback(() => {
-    if (!isRunning.current) return
-    const p = player.current
-    if (p.jumps < 2) { p.vy = JUMP; p.jumps++ }
+    if (!alive.current || pJ.current >= 2) return
+    pVY.current = JUMP; pJ.current++; snd('jump')
   }, [])
 
-  const start = useCallback(() => {
-    player.current = { y: GROUND - 24, vy: 0, jumps: 0 }
-    obstacles.current = []; distRef.current = 0; speedRef.current = 4
-    setDist(0); setGameOver(false); setStarted(true)
-    isRunning.current = true
-    gameLoop()
-  }, [gameLoop])
+  const startGame = useCallback(() => {
+    pY.current=GROUND-PR; pVY.current=0; pJ.current=0
+    spd.current=SPEED_INIT; dist.current=0; sc.current=0
+    obs.current=[]; coins.current=[]; lastCoin.current=0; coinFlash.current=0
+    alive.current=true; setDistDisp(0); setScoreDisp(0); setPhase('play')
+  }, [])
 
   useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const dpr = window.devicePixelRatio || 1
-    canvas.width = W * dpr; canvas.height = H * dpr
-    draw()
-    return () => { isRunning.current = false; cancelAnimationFrame(animRef.current) }
-  }, [draw])
+    if (phase !== 'play') { cancelAnimationFrame(raf.current); return }
+    const canvas = canvasRef.current!
+    const ctx    = canvas.getContext('2d')!
+    const dpr    = window.devicePixelRatio||1
+    canvas.width = W*dpr; canvas.height = H*dpr
+    ctx.scale(dpr, dpr)
+    let frame = 0
 
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => {
-      if ((e.code === 'Space' || e.code === 'ArrowUp') && started && !gameOver) {
-        e.preventDefault(); jump()
+    function loop() {
+      if (!alive.current) return
+      frame++
+      const sp = spd.current
+      spd.current = Math.min(SPEED_MAX, SPEED_INIT + dist.current * 0.003)
+      dist.current += sp * 0.05
+
+      if (frame%3===0) setDistDisp(Math.floor(dist.current))
+
+      // Physics
+      pVY.current += GRAVITY; pY.current += pVY.current
+      if (pY.current >= GROUND-PR) { pY.current=GROUND-PR; pVY.current=0; pJ.current=0 }
+
+      // Spawn obstacles
+      const rightmost = obs.current.reduce((mx,o)=>Math.max(mx,o.x+o.w), 0)
+      const gap = dist.current < 1000 ? 250 : dist.current < 2000 ? 210 : 165
+      if (rightmost < W - gap) obs.current.push(...genGroup(dist.current))
+      obs.current.forEach(o=>{ o.x-=sp })
+      obs.current = obs.current.filter(o=>o.x+o.w>-10)
+
+      // Spawn coins every 1000m
+      if (dist.current >= lastCoin.current + 1000) {
+        lastCoin.current += 1000
+        coins.current.push({ x:W+60, y:GROUND-62, collected:false })
       }
+      coins.current.forEach(c=>{ c.x-=sp })
+      coins.current = coins.current.filter(c=>!c.collected && c.x>-20)
+      coins.current.forEach(c=>{
+        if (!c.collected && Math.abs(c.x-PX)<24 && Math.abs(c.y-pY.current)<24) {
+          c.collected=true; sc.current+=100; coinFlash.current=36; snd('coin')
+          setScoreDisp(sc.current)
+        }
+      })
+
+      // Distance score
+      if (frame%20===0) { sc.current+=1; setScoreDisp(sc.current) }
+      if (coinFlash.current>0) coinFlash.current--
+
+      // Collision
+      const pL=PX-PR+3, pR=PX+PR-3, pT=pY.current-PR+3, pB=pY.current+PR-3
+      for (const o of obs.current) {
+        if (pR>o.x+2 && pL<o.x+o.w-2 && pB>GROUND-o.h+2 && pT<GROUND) {
+          alive.current=false; snd('doom')
+          addXp(Math.floor(sc.current*0.3)); setHighScore('runner', sc.current)
+          setPhase('over'); return
+        }
+      }
+
+      // ── Draw ─────────────────────────────────────────────────────────
+      if (dist.current >= 1500) {
+        const h = 42 + Math.sin(Date.now()/5000*Math.PI*2)*10
+        ctx.fillStyle = `hsl(${h},80%,96%)`
+      } else {
+        ctx.fillStyle = BG
+      }
+      ctx.fillRect(0,0,W,H)
+
+      // Ground band
+      ctx.fillStyle = GC; ctx.fillRect(0,GROUND,W,H-GROUND)
+      ctx.fillStyle = '#FFB830'; ctx.fillRect(0,GROUND,W,2)
+
+      // Obstacles
+      for (const o of obs.current) {
+        const top = GROUND-o.h
+        ctx.fillStyle = o.color
+        ctx.beginPath(); ctx.roundRect(o.x,top,o.w,o.h,6); ctx.fill()
+        ctx.fillStyle = 'rgba(255,255,255,0.18)'
+        ctx.beginPath(); ctx.roundRect(o.x+2,top+2,o.w-4,o.h*0.32,[5,5,0,0]); ctx.fill()
+      }
+
+      // Coins
+      for (const c of coins.current) {
+        if (c.collected) continue
+        const grd = ctx.createRadialGradient(c.x,c.y,0,c.x,c.y,13)
+        grd.addColorStop(0,'#FFE566'); grd.addColorStop(0.6,GC); grd.addColorStop(1,'rgba(255,209,102,0)')
+        ctx.fillStyle = grd; ctx.beginPath(); ctx.arc(c.x,c.y,13,0,Math.PI*2); ctx.fill()
+        ctx.fillStyle=GC; ctx.strokeStyle='#FFC233'; ctx.lineWidth=1.5
+        ctx.beginPath(); ctx.arc(c.x,c.y,8,0,Math.PI*2); ctx.fill(); ctx.stroke()
+      }
+
+      // Player trail
+      drawHex(ctx,PX-8,pY.current+2,PR*0.65,PC,0.18)
+      drawHex(ctx,PX-4,pY.current+1,PR*0.82,PC,0.3)
+      drawHex(ctx,PX,pY.current,PR,PC)
+      // Highlight
+      ctx.globalAlpha=0.3; ctx.fillStyle='white'
+      ctx.beginPath()
+      for(let i=0;i<3;i++){ const a=(Math.PI/3)*i-Math.PI/6; if(i===0) ctx.moveTo(PX+PR*0.55*Math.cos(a)-3,pY.current+PR*0.55*Math.sin(a)-3); else ctx.lineTo(PX+PR*0.55*Math.cos(a)-3,pY.current+PR*0.55*Math.sin(a)-3) }
+      ctx.closePath(); ctx.fill(); ctx.globalAlpha=1
+
+      // Coin collect flash
+      if (coinFlash.current > 0) {
+        ctx.globalAlpha = coinFlash.current/36
+        ctx.fillStyle = '#FFD166'
+        ctx.font = 'bold 16px system-ui'; ctx.textAlign='center'
+        ctx.fillText('+100', PX, pY.current-PR-10)
+        ctx.globalAlpha=1
+      }
+
+      raf.current = requestAnimationFrame(loop)
     }
-    window.addEventListener('keydown', h)
-    return () => window.removeEventListener('keydown', h)
-  }, [started, gameOver, jump])
+
+    raf.current = requestAnimationFrame(loop)
+    return () => { cancelAnimationFrame(raf.current); alive.current=false }
+  }, [phase, addXp, setHighScore])
 
   const best = highScores['runner'] ?? 0
-  const xp = Math.floor(dist)
+
+  if (phase === 'start') return (
+    <div style={{ width:'100%',height:'100%',background:BG,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:24,fontFamily:'system-ui,sans-serif',position:'relative' }}>
+      <button onClick={onExit} style={{ position:'absolute',top:20,left:20,background:'none',border:'none',color:'#BBB',fontSize:22,cursor:'pointer' }}>←</button>
+      <svg width={240} height={90} viewBox="0 0 240 90">
+        <rect width={240} height={90} rx={16} fill="white" opacity={0.7}/>
+        <rect x={0} y={66} width={240} height={24} fill={GC}/>
+        <rect x={0} y={66} width={240} height={2} fill="#FFB830"/>
+        <rect x={100} y={40} width={22} height={26} rx={4} fill="#FF6B6B"/>
+        <rect x={148} y={32} width={22} height={34} rx={4} fill="#FF9F43"/>
+        <rect x={196} y={46} width={22} height={20} rx={4} fill="#FF6B6B"/>
+        <polygon points={hexPts(55,52,15)} fill={PC}/>
+        <polygon points={hexPts(55,52,15)} fill="rgba(255,255,255,0.22)" opacity={0.5} clipPath="inset(0 50% 50% 0)"/>
+        <circle cx={82} cy={48} r={8} fill={GC} stroke="#FFC233" strokeWidth={1.5}/>
+      </svg>
+      <div style={{ textAlign:'center' }}>
+        <h1 style={{ fontSize:28,fontWeight:900,color:'#1A1A2E',margin:'0 0 8px',letterSpacing:'0.05em' }}>HEX RUNNER</h1>
+        <p style={{ color:'#BBB',fontSize:11,fontWeight:700,letterSpacing:'0.14em',margin:0 }}>JUMP · DODGE · SURVIVE</p>
+      </div>
+      <motion.button whileTap={{ scale:0.96 }} onClick={startGame}
+        style={{ background:'#1A1A2E',color:BG,border:'none',borderRadius:16,padding:'16px 64px',fontSize:18,fontWeight:900,cursor:'pointer',letterSpacing:'0.12em' }}>
+        PLAY
+      </motion.button>
+      {best>0 && <p style={{ color:'#BBB',fontSize:13,margin:0 }}>BEST: {best.toLocaleString()}</p>}
+    </div>
+  )
+
+  if (phase === 'over') return (
+    <div style={{ width:'100%',height:'100%',background:BG,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:14,fontFamily:'system-ui,sans-serif' }}>
+      <p style={{ fontSize:12,fontWeight:800,color:'#FF6B6B',letterSpacing:'0.22em',margin:0 }}>GAME OVER</p>
+      <p style={{ fontSize:52,fontWeight:900,color:'#1A1A2E',margin:0,lineHeight:1 }}>{sc.current.toLocaleString()}</p>
+      <div style={{ textAlign:'center' }}>
+        <p style={{ fontSize:9,fontWeight:700,letterSpacing:'0.15em',color:'#BBB',margin:0 }}>DISTANCE</p>
+        <p style={{ fontSize:20,fontWeight:900,color:'#1A1A2E',margin:0 }}>{Math.floor(dist.current).toLocaleString()}m</p>
+      </div>
+      <p style={{ fontSize:13,color:'#AAA',margin:0 }}>XP +{Math.floor(sc.current*0.3)}</p>
+      {sc.current>0 && sc.current>=best && (
+        <p style={{ fontSize:11,color:'#E9B213',fontWeight:800,margin:0,letterSpacing:'0.15em' }}>NEW BEST</p>
+      )}
+      <div style={{ display:'flex',gap:10,marginTop:8 }}>
+        <motion.button whileTap={{ scale:0.96 }} onClick={startGame}
+          style={{ background:'#1A1A2E',color:BG,border:'none',borderRadius:14,padding:'15px 32px',fontSize:14,fontWeight:900,cursor:'pointer',letterSpacing:'0.1em' }}>
+          PLAY AGAIN
+        </motion.button>
+        <motion.button whileTap={{ scale:0.96 }} onClick={onExit}
+          style={{ background:'none',color:'#AAA',border:'1.5px solid rgba(0,0,0,0.12)',borderRadius:14,padding:'15px 22px',fontSize:14,fontWeight:700,cursor:'pointer' }}>
+          HOME
+        </motion.button>
+      </div>
+    </div>
+  )
 
   return (
-    <GameShell theme={T} onExit={onExit} hud={[{ label: 'DIST', value: `${dist}m` }]}>
-      <div className="flex items-center justify-center h-full"
-        onClick={() => started && !gameOver && jump()}
-        onTouchStart={e => { e.preventDefault(); started && !gameOver && jump() }}
-      >
-        <canvas ref={canvasRef} style={{ width: W, height: H }} />
+    <div style={{ width:'100%',height:'100%',background:BG,display:'flex',flexDirection:'column',fontFamily:'system-ui,sans-serif' }}>
+      {/* HUD */}
+      <div style={{ display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 20px 4px',flexShrink:0 }}>
+        <button onClick={()=>{ alive.current=false; onExit() }}
+          style={{ background:'none',border:'none',color:'#CCC',fontSize:20,cursor:'pointer',padding:0 }}>←</button>
+        <div style={{ textAlign:'center' }}>
+          <p style={{ fontSize:9,fontWeight:700,letterSpacing:'0.15em',color:'#BBB',margin:0 }}>DISTANCE</p>
+          <p style={{ fontSize:18,fontWeight:900,color:'#1A1A2E',margin:0,lineHeight:1.1 }}>{distDisp.toLocaleString()}m</p>
+        </div>
+        <div style={{ textAlign:'center' }}>
+          <p style={{ fontSize:9,fontWeight:700,letterSpacing:'0.15em',color:'#BBB',margin:0 }}>SCORE</p>
+          <p style={{ fontSize:18,fontWeight:900,color:'#1A1A2E',margin:0,lineHeight:1.1 }}>{scoreDisp.toLocaleString()}</p>
+        </div>
       </div>
 
-      {!started && !gameOver && <StartOverlay theme={T} onStart={start} />}
-      {gameOver && (
-        <GameOverOverlay
-          theme={T} score={dist} onRestart={start} onExit={onExit}
-          xpEarned={xp} isNewBest={dist > 0 && dist >= best}
+      {/* Canvas */}
+      <div style={{ flex:1,display:'flex',justifyContent:'center',alignItems:'center',overflow:'hidden' }}>
+        <canvas ref={canvasRef} width={W} height={H}
+          onClick={jump}
+          style={{ width:'100%',height:'100%',objectFit:'contain',cursor:'pointer',display:'block' }}
         />
-      )}
-    </GameShell>
+      </div>
+
+      {/* Jump button */}
+      <motion.button whileTap={{ scale:0.97 }} onPointerDown={jump}
+        style={{ flexShrink:0,height:72,background:'rgba(26,26,46,0.05)',border:'none',
+          borderTop:'1.5px solid rgba(0,0,0,0.06)',display:'flex',alignItems:'center',
+          justifyContent:'center',cursor:'pointer',touchAction:'manipulation',userSelect:'none' }}>
+        <span style={{ fontSize:11,fontWeight:800,letterSpacing:'0.22em',color:'rgba(26,26,46,0.3)' }}>JUMP</span>
+      </motion.button>
+    </div>
   )
 }
