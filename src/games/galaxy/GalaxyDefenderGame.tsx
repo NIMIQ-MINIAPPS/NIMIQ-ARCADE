@@ -461,24 +461,24 @@ export default function GalaxyDefenderGame({ onExit }: { onExit: () => void }) {
       </div>
 
       {/* Canvas */}
-      <div style={{ flex:1,display:'flex',justifyContent:'center',alignItems:'center',overflow:'hidden' }}>
+      <div style={{ flex:1,display:'flex',justifyContent:'center',alignItems:'center',overflow:'hidden',position:'relative' }}>
         <canvas ref={canvasRef} width={W} height={H}
-          style={{ width:'100%',height:'100%',objectFit:'contain',display:'block',touchAction:'none' }}/>
-      </div>
+          style={{ maxWidth:'100%',maxHeight:'100%',objectFit:'contain',display:'block',touchAction:'none' }}/>
 
-      {/* Wave banner overlay */}
-      <AnimatePresence>
-        {waveMsg && (
-          <motion.div key={waveMsg}
-            initial={{ scale:0.6,opacity:0 }} animate={{ scale:1,opacity:1 }} exit={{ scale:1.3,opacity:0 }}
-            style={{ position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',pointerEvents:'none' }}>
-            <p style={{ fontSize:32,fontWeight:900,color:'#C4B5FD',letterSpacing:'0.2em',
-              filter:'drop-shadow(0 2px 14px rgba(196,181,253,0.7))',margin:0 }}>
-              {waveMsg}
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
+        {/* Wave banner overlay */}
+        <AnimatePresence>
+          {waveMsg && (
+            <motion.div key={waveMsg}
+              initial={{ scale:0.6,opacity:0 }} animate={{ scale:1,opacity:1 }} exit={{ scale:1.3,opacity:0 }}
+              style={{ position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',pointerEvents:'none' }}>
+              <p style={{ fontSize:32,fontWeight:900,color:'#C4B5FD',letterSpacing:'0.2em',
+                filter:'drop-shadow(0 2px 14px rgba(196,181,253,0.7))',margin:0 }}>
+                {waveMsg}
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   )
 }

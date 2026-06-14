@@ -343,7 +343,7 @@ export default function LowdownGame({ onExit }: { onExit: () => void }) {
       </div>
 
       {/* Buttons */}
-      <div style={{ display:'flex',gap:12,padding:'12px 20px 20px',flexShrink:0 }}>
+      <div style={{ display:'flex',gap:12,padding:'12px 20px',paddingBottom:'max(20px, env(safe-area-inset-bottom, 20px))',flexShrink:0 }}>
         <motion.button whileTap={{ scale:0.95 }} onPointerDown={() => handleAnswer('higher')}
           style={{ flex:1,height:72,background:COL_HI,border:'none',borderRadius:20,
             fontSize:18,fontWeight:900,color:'#1A1A2E',cursor:'pointer',touchAction:'manipulation',

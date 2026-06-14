@@ -85,6 +85,7 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
   const spd   = useRef(SPEED_INIT), dist = useRef(0), sc = useRef(0)
   const obs   = useRef<OData[]>([]), coins = useRef<Coin[]>([])
   const lastCoin = useRef(0), coinFlash = useRef(0)
+  const rollAngle = useRef(0)
   const alive = useRef(false), raf = useRef(0)
 
   const jump = useCallback(() => {
@@ -96,6 +97,7 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
     pY.current=GROUND-PR; pVY.current=0; pJ.current=0
     spd.current=SPEED_INIT; dist.current=0; sc.current=0
     obs.current=[]; coins.current=[]; lastCoin.current=0; coinFlash.current=0
+    rollAngle.current=0
     alive.current=true; setDistDisp(0); setScoreDisp(0); setPhase('play')
   }, [])
 
@@ -188,15 +190,25 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
         ctx.beginPath(); ctx.arc(c.x,c.y,8,0,Math.PI*2); ctx.fill(); ctx.stroke()
       }
 
-      // Player trail
-      drawHex(ctx,PX-8,pY.current+2,PR*0.65,PC,0.18)
-      drawHex(ctx,PX-4,pY.current+1,PR*0.82,PC,0.3)
-      drawHex(ctx,PX,pY.current,PR,PC)
-      // Highlight
-      ctx.globalAlpha=0.3; ctx.fillStyle='white'
-      ctx.beginPath()
-      for(let i=0;i<3;i++){ const a=(Math.PI/3)*i-Math.PI/6; if(i===0) ctx.moveTo(PX+PR*0.55*Math.cos(a)-3,pY.current+PR*0.55*Math.sin(a)-3); else ctx.lineTo(PX+PR*0.55*Math.cos(a)-3,pY.current+PR*0.55*Math.sin(a)-3) }
-      ctx.closePath(); ctx.fill(); ctx.globalAlpha=1
+      // Roll when on ground
+      if (pJ.current === 0) rollAngle.current += sp * 0.05 / PR
+
+      // Player trail (ghost hexes)
+      drawHex(ctx,PX-8,pY.current+2,PR*0.65,PC,0.14)
+      drawHex(ctx,PX-4,pY.current+1,PR*0.82,PC,0.26)
+
+      // Player (rotating hex)
+      ctx.save()
+      ctx.translate(PX, pY.current)
+      ctx.rotate(rollAngle.current)
+      ctx.fillStyle = PC; ctx.beginPath()
+      for(let i=0;i<6;i++){ const a=(Math.PI/3)*i-Math.PI/6; i===0?ctx.moveTo(PR*Math.cos(a),PR*Math.sin(a)):ctx.lineTo(PR*Math.cos(a),PR*Math.sin(a)) }
+      ctx.closePath(); ctx.fill()
+      // Highlight slice
+      ctx.globalAlpha=0.32; ctx.fillStyle='white'; ctx.beginPath()
+      for(let i=0;i<3;i++){ const a=(Math.PI/3)*i-Math.PI/6; i===0?ctx.moveTo(PR*0.55*Math.cos(a),PR*0.55*Math.sin(a)):ctx.lineTo(PR*0.55*Math.cos(a),PR*0.55*Math.sin(a)) }
+      ctx.closePath(); ctx.fill()
+      ctx.globalAlpha=1; ctx.restore()
 
       // Coin collect flash
       if (coinFlash.current > 0) {
@@ -293,7 +305,7 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
 
       {/* Jump button */}
       <motion.button whileTap={{ scale:0.97 }} onPointerDown={jump}
-        style={{ flexShrink:0,height:72,background:'rgba(26,26,46,0.05)',border:'none',
+        style={{ flexShrink:0,minHeight:72,paddingBottom:'env(safe-area-inset-bottom, 0px)',background:'rgba(26,26,46,0.05)',border:'none',
           borderTop:'1.5px solid rgba(0,0,0,0.06)',display:'flex',alignItems:'center',
           justifyContent:'center',cursor:'pointer',touchAction:'manipulation',userSelect:'none' }}>
         <span style={{ fontSize:11,fontWeight:800,letterSpacing:'0.22em',color:'rgba(26,26,46,0.3)' }}>JUMP</span>

@@ -161,8 +161,8 @@ export default function GamesPage() {
           <motion.div
             key="game"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 mx-auto"
-            style={{ maxWidth: 430, background: '#0C0A06' }}
+            className="fixed inset-x-0 top-0 z-50 mx-auto overflow-hidden"
+            style={{ maxWidth: 430, background: '#0C0A06', height: '100dvh' }}
           >
             {renderGame()}
           </motion.div>

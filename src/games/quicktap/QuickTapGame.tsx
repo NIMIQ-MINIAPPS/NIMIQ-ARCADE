@@ -112,25 +112,20 @@ export default function QuickTapGame({ onExit }: { onExit: () => void }) {
 
   const spawnTarget = useCallback(() => {
     const area = areaRef.current
-    if (!area) return
+    if (!area || !alive.current) return
     const rect   = area.getBoundingClientRect()
-    const stage  = getStage(hitsRef.current)
-    const active = targets  // stale but OK for count check
-    const nonDecoyCount = active.filter(t => !t.isDecoy).length
-
-    if (nonDecoyCount >= maxSimult(stage)) return
-
-    const sz     = targetSize(stage)
-    const isDecoy = stage >= 6 && Math.random() < 0.28
+    const st     = getStage(hitsRef.current)
+    const sz     = targetSize(st)
+    const isDecoy = st >= 6 && Math.random() < 0.28
     const color  = isDecoy ? DECOY_COL : PASTEL_COLS[Math.floor(Math.random() * PASTEL_COLS.length)]
-    const moving = stage >= 4
-    const speed  = moving ? (0.6 + Math.random() * 1.2) : 0
-    const angle  = Math.random() * Math.PI * 2
-    const rotating = stage >= 7
-    const rotSpd = rotating ? (2 + Math.random() * 3) * (Math.random() > 0.5 ? 1 : -1) : 0
+    const moving  = st >= 4
+    const speed   = moving ? (0.6 + Math.random() * 1.2) : 0
+    const angle   = Math.random() * Math.PI * 2
+    const rotating = st >= 7
+    const rotSpd  = rotating ? (2 + Math.random() * 3) * (Math.random() > 0.5 ? 1 : -1) : 0
 
     setTargets(prev => {
-      if (prev.filter(t => !t.isDecoy).length >= maxSimult(stage)) return prev
+      if (prev.filter(t => !t.isDecoy).length >= maxSimult(st)) return prev
       return [...prev, {
         id: ++_uid,
         x: Math.random() * (rect.width  - sz - 16) + 8,
@@ -142,7 +137,7 @@ export default function QuickTapGame({ onExit }: { onExit: () => void }) {
         color, isDecoy,
       }]
     })
-  }, [targets])
+  }, [])
 
   const startGame = useCallback(() => {
     alive.current = true; scoreRef.current = 0; hitsRef.current = 0; missRef.current = 0

@@ -386,7 +386,7 @@ export default function SnakeGame({ onExit }: { onExit: () => void }) {
       {/* Canvas */}
       <div style={{ flex:1, display:'flex', justifyContent:'center', alignItems:'center', position:'relative', overflow:'hidden' }}>
         <canvas ref={canvasRef}
-          style={{ width:W, height:H, borderRadius:10, boxShadow:'0 4px 24px rgba(0,0,0,0.07)' }}
+          style={{ maxWidth:'100%', maxHeight:'100%', width:W, height:H, borderRadius:10, boxShadow:'0 4px 24px rgba(0,0,0,0.07)', objectFit:'contain' }}
         />
         {/* Score flash */}
         {scoreFlash && (
@@ -407,7 +407,7 @@ export default function SnakeGame({ onExit }: { onExit: () => void }) {
       </div>
 
       {/* D-pad */}
-      <div style={{ flexShrink:0, padding:'8px 0 14px', display:'flex', justifyContent:'center' }}>
+      <div style={{ flexShrink:0, padding:'8px 0', paddingBottom:'max(14px, env(safe-area-inset-bottom, 14px))', display:'flex', justifyContent:'center' }}>
         <div style={{ display:'grid', gridTemplateColumns:'76px 76px 76px', gridTemplateRows:'72px 72px 72px', gap:6 }}>
           {/* Up */}
           <div style={{ gridColumn:2, gridRow:1 }}>

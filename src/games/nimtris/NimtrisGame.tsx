@@ -464,12 +464,12 @@ export default function NimtrisGame({ onExit }: { onExit: () => void }) {
       <div style={{ flex:1, display:'flex', justifyContent:'center', alignItems:'center', overflow:'hidden' }}>
         <canvas
           ref={canvasRef}
-          style={{ width:COLS*BLOCK, height:ROWS*BLOCK, borderRadius:6, boxShadow:'0 4px 24px rgba(0,0,0,0.07)' }}
+          style={{ maxWidth:'100%', maxHeight:'100%', width:COLS*BLOCK, height:ROWS*BLOCK, borderRadius:6, boxShadow:'0 4px 24px rgba(0,0,0,0.07)', objectFit:'contain' }}
         />
       </div>
 
       {/* Controls */}
-      <div style={{ flexShrink:0, padding:'8px 16px 14px', display:'flex', flexDirection:'column', gap:8 }}>
+      <div style={{ flexShrink:0, padding:'8px 16px', paddingBottom:'max(14px, env(safe-area-inset-bottom, 14px))', display:'flex', flexDirection:'column', gap:8 }}>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
           <Btn label="◀" onPress={() => {
             if (flashRef.current) return
