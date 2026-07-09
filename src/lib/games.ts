@@ -37,7 +37,7 @@ export const GAMES: GameDef[] = [
     category: 'brain',
     difficulty: 'Hard',
     xpMultiplier: 1.8,
-    available: false,
+    available: true,
   },
   {
     id: 'color-stroop',
@@ -73,7 +73,7 @@ export const GAMES: GameDef[] = [
     category: 'brain',
     difficulty: 'Easy',
     xpMultiplier: 0.8,
-    available: false,
+    available: true,
   },
   {
     id: 'speed-sort',
@@ -82,7 +82,7 @@ export const GAMES: GameDef[] = [
     category: 'brain',
     difficulty: 'Easy',
     xpMultiplier: 0.9,
-    available: false,
+    available: true,
   },
   {
     id: 'word-fresh',
@@ -155,7 +155,7 @@ export const GAMES: GameDef[] = [
     category: 'classic',
     difficulty: 'Medium',
     xpMultiplier: 1.1,
-    available: false,
+    available: true,
   },
   {
     id: 'breakwall',
@@ -173,7 +173,7 @@ export const GAMES: GameDef[] = [
     category: 'classic',
     difficulty: 'Medium',
     xpMultiplier: 1.0,
-    available: false,
+    available: true,
   },
   {
     id: 'asteroid-field',
@@ -182,7 +182,7 @@ export const GAMES: GameDef[] = [
     category: 'classic',
     difficulty: 'Medium',
     xpMultiplier: 1.1,
-    available: false,
+    available: true,
   },
   {
     id: 'frog-cross',
@@ -191,7 +191,7 @@ export const GAMES: GameDef[] = [
     category: 'classic',
     difficulty: 'Easy',
     xpMultiplier: 0.8,
-    available: false,
+    available: true,
   },
   {
     id: 'pong-duel',
@@ -228,7 +228,7 @@ export const GAMES: GameDef[] = [
     category: 'action',
     difficulty: 'Hard',
     xpMultiplier: 1.6,
-    available: false,
+    available: true,
   },
   {
     id: 'neon-blade',
@@ -237,7 +237,7 @@ export const GAMES: GameDef[] = [
     category: 'action',
     difficulty: 'Medium',
     xpMultiplier: 1.2,
-    available: false,
+    available: true,
   },
   {
     id: 'dodge-storm',
@@ -246,7 +246,7 @@ export const GAMES: GameDef[] = [
     category: 'action',
     difficulty: 'Hard',
     xpMultiplier: 1.5,
-    available: false,
+    available: true,
   },
   {
     id: 'tower-stack',
@@ -292,7 +292,7 @@ export const GAMES: GameDef[] = [
     category: 'puzzle',
     difficulty: 'Medium',
     xpMultiplier: 1.2,
-    available: false,
+    available: true,
   },
   {
     id: 'color-path',
@@ -301,7 +301,7 @@ export const GAMES: GameDef[] = [
     category: 'puzzle',
     difficulty: 'Easy',
     xpMultiplier: 0.9,
-    available: false,
+    available: true,
   },
   {
     id: 'shift-blocks',
@@ -310,7 +310,7 @@ export const GAMES: GameDef[] = [
     category: 'puzzle',
     difficulty: 'Medium',
     xpMultiplier: 1.1,
-    available: false,
+    available: true,
   },
   {
     id: 'hex-flow',
@@ -319,7 +319,7 @@ export const GAMES: GameDef[] = [
     category: 'puzzle',
     difficulty: 'Medium',
     xpMultiplier: 1.0,
-    available: false,
+    available: true,
   },
   {
     id: 'light-bounce',
@@ -328,7 +328,7 @@ export const GAMES: GameDef[] = [
     category: 'puzzle',
     difficulty: 'Hard',
     xpMultiplier: 1.4,
-    available: false,
+    available: true,
   },
   {
     id: 'sum-path',
@@ -337,7 +337,7 @@ export const GAMES: GameDef[] = [
     category: 'puzzle',
     difficulty: 'Hard',
     xpMultiplier: 1.5,
-    available: false,
+    available: true,
   },
 ]
 

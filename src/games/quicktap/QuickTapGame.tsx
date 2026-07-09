@@ -101,7 +101,6 @@ export default function QuickTapGame({ onExit }: { onExit: () => void }) {
   const [flashes, setFlashes] = useState<Flash[]>([])
   const [score,   setScore]   = useState(0)
   const [misses,  setMisses]  = useState(0)
-  const [hits,    setHits]    = useState(0)
   const [stage,   setStage]   = useState(1)
 
   const scoreRef  = useRef(0), hitsRef = useRef(0), missRef = useRef(0)
@@ -141,7 +140,7 @@ export default function QuickTapGame({ onExit }: { onExit: () => void }) {
 
   const startGame = useCallback(() => {
     alive.current = true; scoreRef.current = 0; hitsRef.current = 0; missRef.current = 0
-    setScore(0); setHits(0); setMisses(0); setStage(1); setTargets([]); setFlashes([])
+    setScore(0); setMisses(0); setStage(1); setTargets([]); setFlashes([])
     setPhase('play')
   }, [])
 
@@ -220,8 +219,8 @@ export default function QuickTapGame({ onExit }: { onExit: () => void }) {
     const reaction = Date.now() - t.born
     const [label, pts, color] = scoreLabel(reaction)
     scoreRef.current += pts; setScore(scoreRef.current)
-    hitsRef.current++; const newHits = hitsRef.current; setHits(newHits)
-    const newStage = getStage(newHits); setStage(newStage)
+    hitsRef.current++
+    const newStage = getStage(hitsRef.current); setStage(newStage)
     const fid = ++_uid
     setFlashes(prev => [...prev, { id: fid, text: `${label} +${pts}`, x: t.x + t.size/2, y: t.y, color }])
     setTimeout(() => setFlashes(prev => prev.filter(f => f.id !== fid)), 750)

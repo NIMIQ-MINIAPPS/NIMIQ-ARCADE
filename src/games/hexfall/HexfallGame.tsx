@@ -114,7 +114,6 @@ export default function HexfallGame({ onExit }: { onExit: () => void }) {
   const [cells, setCells]   = useState<HexCell[]>(initCells)
   const [phase, setPhase]   = useState<'start'|'play'|'over'>('start')
   const [score, setScore]   = useState(0)
-  const [combo, setCombo]   = useState(0)
   const [moves, setMoves]   = useState(30)
   const [comboFlash, setComboFlash] = useState<string|null>(null)
 
@@ -125,7 +124,7 @@ export default function HexfallGame({ onExit }: { onExit: () => void }) {
 
   const startGame = useCallback(() => {
     scoreRef.current = 0; comboRef.current = 0; movesRef.current = 30
-    setScore(0); setCombo(0); setMoves(30)
+    setScore(0); setMoves(30)
     setCells(initCells())
     setComboFlash(null)
     setPhase('play')
@@ -142,7 +141,6 @@ export default function HexfallGame({ onExit }: { onExit: () => void }) {
     const pts = group.length * 10 * comboRef.current
     scoreRef.current += pts
     setScore(scoreRef.current)
-    setCombo(comboRef.current)
 
     if (comboRef.current >= 3) {
       setComboFlash(`COMBO ×${comboRef.current}`)

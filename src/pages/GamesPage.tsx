@@ -23,6 +23,22 @@ import PerilousPathGame from '../games/perilous/PerilousPathGame'
 import GalaxyDefenderGame from '../games/galaxy/GalaxyDefenderGame'
 import MiniSudokuGame from '../games/sudoku/MiniSudokuGame'
 import ColorStroopGame from '../games/colorstroop/ColorStroopGame'
+import DualNBackGame from '../games/dualnback/DualNBackGame'
+import FocusGridGame from '../games/focusgrid/FocusGridGame'
+import SpeedSortGame from '../games/speedsort/SpeedSortGame'
+import SpaceRaidGame from '../games/spaceraid/SpaceRaidGame'
+import PacMazeGame from '../games/pacmaze/PacMazeGame'
+import AsteroidFieldGame from '../games/asteroidfield/AsteroidFieldGame'
+import FrogCrossGame from '../games/frogcross/FrogCrossGame'
+import GravitySwitchGame from '../games/gravityswitch/GravitySwitchGame'
+import NeonBladeGame from '../games/neonblade/NeonBladeGame'
+import DodgeStormGame from '../games/dodgestorm/DodgeStormGame'
+import MergeHexGame from '../games/mergehex/MergeHexGame'
+import ColorPathGame from '../games/colorpath/ColorPathGame'
+import ShiftBlocksGame from '../games/shiftblocks/ShiftBlocksGame'
+import HexFlowGame from '../games/hexflow/HexFlowGame'
+import LightBounceGame from '../games/lightbounce/LightBounceGame'
+import SumPathGame from '../games/sumpath/SumPathGame'
 import { Lock, Star, Zap, ChevronRight } from 'lucide-react'
 
 const CAT_LABELS: Record<Exclude<GameCategory,'all'>, string> = {
@@ -152,6 +168,22 @@ export default function GamesPage() {
       case 'galaxy-defender': return <GalaxyDefenderGame onExit={exit} />
       case 'mini-sudoku':    return <MiniSudokuGame onExit={exit} />
       case 'color-stroop':   return <ColorStroopGame onExit={exit} />
+      case 'dual-n-back':    return <DualNBackGame onExit={exit} />
+      case 'focus-grid':     return <FocusGridGame onExit={exit} />
+      case 'speed-sort':     return <SpeedSortGame onExit={exit} />
+      case 'space-raid':     return <SpaceRaidGame onExit={exit} />
+      case 'pac-maze':       return <PacMazeGame onExit={exit} />
+      case 'asteroid-field': return <AsteroidFieldGame onExit={exit} />
+      case 'frog-cross':     return <FrogCrossGame onExit={exit} />
+      case 'gravity-switch': return <GravitySwitchGame onExit={exit} />
+      case 'neon-blade':     return <NeonBladeGame onExit={exit} />
+      case 'dodge-storm':    return <DodgeStormGame onExit={exit} />
+      case 'merge-hex':      return <MergeHexGame onExit={exit} />
+      case 'color-path':     return <ColorPathGame onExit={exit} />
+      case 'shift-blocks':   return <ShiftBlocksGame onExit={exit} />
+      case 'hex-flow':       return <HexFlowGame onExit={exit} />
+      case 'light-bounce':   return <LightBounceGame onExit={exit} />
+      case 'sum-path':       return <SumPathGame onExit={exit} />
       default: return null
     }
   }
