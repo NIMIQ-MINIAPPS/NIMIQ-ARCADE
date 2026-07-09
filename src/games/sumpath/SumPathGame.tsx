@@ -38,7 +38,7 @@ function randomWalk(size: number, targetLen: number): number[] {
 
 function generateRound(round: number): RoundData {
   const tier = Math.floor((round - 1) / 3)
-  const size = Math.min(4 + tier, 6)
+  const size = Math.min(4 + tier, 7)
   const cells = size * size
   const minLen = Math.min(3 + tier, cells - 1)
   const maxLen = Math.min(7 + tier, cells - 1)

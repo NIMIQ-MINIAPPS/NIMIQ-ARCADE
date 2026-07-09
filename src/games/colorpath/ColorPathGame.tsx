@@ -87,7 +87,7 @@ function buildLevel(size: number, pairsCount: number): LevelData {
   return { size, pairs: trivialLevel(size, pairsCount) }
 }
 
-function sizeForLevel(lv: number) { return Math.min(5 + Math.floor((lv - 1) / 3), 8) }
+function sizeForLevel(lv: number) { return Math.min(5 + Math.floor((lv - 1) / 3), 9) }
 function pairsForLevel(lv: number, size: number) {
   const cap = Math.max(3, Math.floor((size * size) / 6))
   return Math.min(3 + (lv - 1), cap, COLORS.length)

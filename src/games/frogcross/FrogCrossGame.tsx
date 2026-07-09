@@ -13,8 +13,8 @@ interface Hazard { x: number; width: number; speed: number; color: string }
 interface Lane { type: LaneType; hazards: Hazard[] }
 
 function levelParams(level: number) {
-  const roadLanes = Math.min(2 + Math.floor(level / 2), 5)
-  const riverLanes = Math.min(2 + Math.floor(level / 2), 4)
+  const roadLanes = Math.min(2 + Math.floor(level / 2), 7)
+  const riverLanes = Math.min(2 + Math.floor(level / 2), 6)
   const speedMul = 1 + level * 0.12
   return { roadLanes, riverLanes, speedMul }
 }

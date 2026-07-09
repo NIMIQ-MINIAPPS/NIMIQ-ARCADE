@@ -145,7 +145,7 @@ function cloneLevel(lv: LevelDef): LevelDef {
 // Deterministically-safe procedural growth: never places a new block on the goal's
 // travel row/column, so every hand-authored solution path stays intact.
 function extendLevel(base: LevelDef, growth: number): LevelDef {
-  const MAX_DIM = 9
+  const MAX_DIM = 11
   const cols = Math.min(MAX_DIM, base.cols + growth)
   const rows = Math.min(MAX_DIM, base.rows + growth)
   const blocks = base.blocks.map(b => ({ ...b }))
@@ -160,10 +160,10 @@ function extendLevel(base: LevelDef, growth: number): LevelDef {
   const criticalCol = goal.axis === 'v' ? goal.x : -1
   const occupied = (x: number, y: number) => blocks.some(b => x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h)
 
-  const extraCount = Math.min(4, growth + 1)
+  const extraCount = Math.min(14, growth + 1)
   let placed = 0
   let attempts = 0
-  while (placed < extraCount && attempts < 80) {
+  while (placed < extraCount && attempts < 200) {
     attempts++
     const axis: Axis = Math.random() < 0.5 ? 'h' : 'v'
     const w = axis === 'h' ? 2 : 1

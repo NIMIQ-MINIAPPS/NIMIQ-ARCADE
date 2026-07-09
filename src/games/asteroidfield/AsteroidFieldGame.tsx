@@ -28,7 +28,7 @@ function makeAsteroid(size: Size, x: number, y: number, level: number): Asteroid
 }
 
 function spawnField(level: number): Asteroid[] {
-  const n = Math.min(3 + level, 9)
+  const n = Math.min(3 + level, 18)
   const out: Asteroid[] = []
   for (let i = 0; i < n; i++) {
     let x = 0, y = 0

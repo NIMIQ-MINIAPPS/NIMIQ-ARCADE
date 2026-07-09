@@ -46,7 +46,10 @@ function axialToPixel(q: number, r: number, cellR: number): { x: number; y: numb
 }
 
 function cellRadiusFor(boardRadius: number): number {
-  return boardRadius <= 2 ? 27 : 20
+  if (boardRadius <= 2) return 27
+  if (boardRadius <= 3) return 20
+  if (boardRadius <= 4) return 16
+  return 13
 }
 
 // ── tile model ───────────────────────────────────────────────────────────────
@@ -149,8 +152,10 @@ function bfsDistances(treeEdges: Map<string, Set<number>>, sourceKey: string): M
 }
 
 function levelParams(level: number): { radius: number; outlets: number } {
-  const outlets = level <= 1 ? 2 : level === 2 ? 3 : 4
-  const radius = level <= 3 ? 2 : 3
+  const radius = Math.min(2 + Math.floor((level - 1) / 4), 6)
+  const cellCount = 3 * radius * radius + 3 * radius + 1
+  const maxOutlets = Math.max(2, cellCount - 4)
+  const outlets = Math.min(2 + Math.floor((level - 1) / 2), maxOutlets)
   return { radius, outlets }
 }
 

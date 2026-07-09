@@ -65,7 +65,7 @@ export default function GravitySwitchGame({ onExit }: { onExit: () => void }) {
     const ctx = canvasRef.current?.getContext('2d')
     if (!ctx) { raf.current = requestAnimationFrame(loop); return }
 
-    const speed = Math.min(3 + distance.current * 0.0006, 9)
+    const speed = Math.min(3 + distance.current * 0.0004, 18)
     distance.current += speed
     scoreRef.current = Math.floor(distance.current / 8); setScore(scoreRef.current)
 
@@ -73,9 +73,9 @@ export default function GravitySwitchGame({ onExit }: { onExit: () => void }) {
     playerY.current += (targetY - playerY.current) * 0.32
 
     while (nextSpawnX.current < distance.current + W + 200) {
-      const gap = Math.max(150, 280 - distance.current * 0.01)
+      const gap = Math.max(90, 280 - distance.current * 0.008)
       const side: 'floor' | 'ceiling' = Math.random() < 0.5 ? 'floor' : 'ceiling'
-      const height = 55 + Math.min(distance.current * 0.01, 40) + Math.random() * 20
+      const height = 55 + Math.min(distance.current * 0.006, 90) + Math.random() * 20
       const width = 24 + Math.random() * 14
       obstacles.current.push({ x: nextSpawnX.current, width, side, height, passed: false })
       nextSpawnX.current += gap

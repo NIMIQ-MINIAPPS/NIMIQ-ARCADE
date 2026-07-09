@@ -14,10 +14,10 @@ interface Ghost { x: number; y: number; dir: Dir; color: string; frightened: boo
 interface Particle { x: number; y: number; vx: number; vy: number; life: number; maxLife: number; color: string }
 
 function mazeParams(level: number) {
-  const cells = Math.min(6 + Math.floor(level / 2), 12)
-  const ghostCount = Math.min(2 + Math.floor((level - 1) / 2), 5)
-  const tickMs = Math.max(105, 165 - level * 5)
-  const frightMs = Math.max(3500, 7000 - level * 300)
+  const cells = Math.min(6 + Math.floor(level / 2), 16)
+  const ghostCount = Math.min(2 + Math.floor((level - 1) / 2), 8)
+  const tickMs = Math.max(80, 165 - level * 5)
+  const frightMs = Math.max(2200, 7000 - level * 300)
   return { cells, ghostCount, tickMs, frightMs }
 }
 

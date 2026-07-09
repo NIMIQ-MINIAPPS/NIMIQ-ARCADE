@@ -115,7 +115,7 @@ function waveEnemies(wave: number): Enemy[] {
   const add = (t: EnemyType, n: number) => { for (let i = 0; i < n; i++) out.push(makeEnemy(t, wave)) }
   if (wave <= 3) add('grunt', 3 + wave * 2)
   else if (wave <= 7) { add('grunt', 5 + wave); add('sniper', Math.floor(wave / 2)) }
-  else { add('grunt', 6); add('sniper', 4); add('heavy', Math.min(Math.floor(wave / 4), 6)) }
+  else { add('grunt', Math.min(6 + Math.floor(wave / 3), 16)); add('sniper', Math.min(4 + Math.floor(wave / 5), 10)); add('heavy', Math.min(Math.floor(wave / 4), 14)) }
   return out
 }
 

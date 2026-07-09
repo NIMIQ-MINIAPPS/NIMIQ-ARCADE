@@ -88,7 +88,7 @@ function spawnLine(wave: number, px: number, py: number, sine: boolean): Proj {
 function spawnBurst(wave: number): Proj[] {
   const edge = Math.floor(Math.random() * 4)
   const origin = edgePoint(edge)
-  const n = Math.min(6 + Math.floor(wave * 0.8), 16)
+  const n = Math.min(6 + Math.floor(wave * 0.8), 26)
   const speed = 1.6 + wave * 0.1
   const rot = Math.random() * Math.PI * 2
   const arr: Proj[] = []
@@ -103,7 +103,7 @@ function spawnBurst(wave: number): Proj[] {
 }
 
 function spawnWall(wave: number): Proj {
-  const gapW = Math.max(70 - wave * 1.5, 46)
+  const gapW = Math.max(70 - wave * 1.5, 34)
   const gapStart = 20 + Math.random() * (W - 40 - gapW)
   const speed = 0.9 + wave * 0.05
   return {
@@ -167,7 +167,7 @@ export default function DodgeStormGame({ onExit }: { onExit: () => void }) {
 
   const scheduleSpawn = useCallback(() => {
     const wv = waveRef.current
-    const rate = Math.max(200, 780 - wv * 38)
+    const rate = Math.max(120, 780 - wv * 38)
     spawnTimer.current = setTimeout(() => {
       if (!alive.current) return
       doSpawn()

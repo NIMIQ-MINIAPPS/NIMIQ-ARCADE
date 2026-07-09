@@ -14,9 +14,9 @@ interface Particle { x: number; y: number; vx: number; vy: number; life: number;
 interface TrailPt { x: number; y: number; t: number }
 
 let _id = 0
-function stageOf(score: number) { return Math.min(1 + Math.floor(score / 300), 10) }
-function spawnRate(stage: number) { return Math.max(500, 1100 - stage * 60) }
-function bombChance(stage: number) { return Math.min(0.12 + stage * 0.02, 0.32) }
+function stageOf(score: number) { return 1 + Math.floor(score / 300) }
+function spawnRate(stage: number) { return Math.max(380, 1100 - stage * 60) }
+function bombChance(stage: number) { return Math.min(0.12 + stage * 0.02, 0.4) }
 
 let _ac: AudioContext | null = null
 function snd(type: 'slice' | 'bomb' | 'miss' | 'combo' | 'over') {

@@ -10,7 +10,7 @@ const NOTE: Record<string, number> = { B: 392, D: 440, F: 494, G: 523, K: 587, P
 
 interface Stim { pos: number; letter: string }
 
-function stageOf(hits: number) { return Math.min(1 + Math.floor(hits / 6), 4) }
+function stageOf(hits: number) { return 1 + Math.floor(hits / 6) }
 function turnDuration(stage: number) { return Math.max(1500, 3000 - stage * 220) }
 
 function genStim(seq: Stim[], n: number): Stim {

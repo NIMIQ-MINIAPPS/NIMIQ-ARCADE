@@ -719,15 +719,21 @@ function DodgeStorm({ className }: IllProps) {
   const bullets = [[30,20],[80,10],[120,35],[55,50],[140,15],[20,70],[100,60]]
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill={BG} />
+      <defs>
+        <linearGradient id="ds-bg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#171334" />
+          <stop offset="100%" stopColor="#0B0920" />
+        </linearGradient>
+      </defs>
+      <rect width="160" height="108" fill="url(#ds-bg)" />
       {bullets.map(([x,y],i)=>(
-        <circle key={i} cx={x} cy={y} r="4" fill={'#C46B5A'} opacity=".8" />
+        <circle key={i} cx={x} cy={y} r="4" fill={'#FF6B6B'} opacity=".85" />
       ))}
       {bullets.map(([x,y],i)=>(
-        <line key={`t${i}`} x1={x} y1={y} x2={x-12} y2={y+4} stroke={'#C46B5A'} strokeWidth="1.5" opacity=".4" />
+        <line key={`t${i}`} x1={x} y1={y} x2={x-12} y2={y+4} stroke={'#FF6B6B'} strokeWidth="1.5" opacity=".4" />
       ))}
-      <HexPath cx={80} cy={80} r={14} fill={G} />
-      <HexPath cx={80} cy={80} r={10} fill={GB} />
+      <circle cx="80" cy="80" r="14" fill="none" stroke="#7DE3FF" strokeWidth="1.5" opacity=".5" />
+      <circle cx="80" cy="80" r="7" fill="#7DE3FF" />
     </svg>
   )
 }
@@ -863,7 +869,7 @@ function ShiftBlocks({ className }: IllProps) {
 function HexFlow({ className }: IllProps) {
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill={BG} />
+      <rect width="160" height="108" fill="#0B1420" />
       {/* pipe segments */}
       {[
         {x:30,y:30,type:'corner'},{x:65,y:30,type:'h'},{x:100,y:30,type:'corner2'},
@@ -871,14 +877,14 @@ function HexFlow({ className }: IllProps) {
         {x:30,y:86,type:'corner3'},{x:65,y:86,type:'h2'},{x:100,y:86,type:'end'},
       ].map((seg,i)=>(
         <rect key={i} x={seg.x-12} y={seg.y-12} width="24" height="24" rx="4"
-          fill={'#201C15'} stroke={i<5?G:DIM} strokeWidth={i<5?1.5:1} />
+          fill={'#17212F'} stroke={i<5?'#22D3EE':'#2A3648'} strokeWidth={i<5?1.5:1} />
       ))}
       {/* flow */}
-      <path d="M30,30 H100 V86 H65" stroke={G} strokeWidth="4" fill="none"
-        strokeLinecap="round" strokeLinejoin="round" opacity=".5" />
+      <path d="M30,30 H100 V86 H65" stroke="#22D3EE" strokeWidth="4" fill="none"
+        strokeLinecap="round" strokeLinejoin="round" opacity=".65" />
       {/* source */}
-      <circle cx="30" cy="30" r="8" fill={G} />
-      <circle cx="65" cy="86" r="8" fill={C} opacity=".7" />
+      <circle cx="30" cy="30" r="8" fill="#67E8F9" />
+      <circle cx="65" cy="86" r="8" fill="#22D3EE" opacity=".7" />
     </svg>
   )
 }
@@ -888,15 +894,15 @@ function LightBounce({ className }: IllProps) {
     <svg viewBox="0 0 160 108" className={className}>
       <rect width="160" height="108" fill={BG} />
       {/* beam */}
-      <path d="M20,20 L80,80 L140,30" stroke={GB} strokeWidth="2" fill="none" opacity=".8" />
-      <path d="M20,20 L80,80 L140,30" stroke={C} strokeWidth="1" fill="none" opacity=".3" />
+      <path d="M20,20 L80,80 L140,30" stroke="#7DD3FC" strokeWidth="2" fill="none" opacity=".85" />
+      <path d="M20,20 L80,80 L140,30" stroke="#7DD3FC" strokeWidth="1" fill="none" opacity=".3" />
       {/* mirrors */}
-      <line x1="70" y1="90" x2="90" y2="70" stroke={C} strokeWidth="3" strokeLinecap="round" opacity=".9" />
-      <line x1="125" y1="20" x2="145" y2="40" stroke={C} strokeWidth="3" strokeLinecap="round" opacity=".9" />
+      <line x1="70" y1="90" x2="90" y2="70" stroke="#93C5FD" strokeWidth="3" strokeLinecap="round" opacity=".9" />
+      <line x1="125" y1="20" x2="145" y2="40" stroke="#93C5FD" strokeWidth="3" strokeLinecap="round" opacity=".9" />
       {/* crystals */}
       <polygon points="20,12 26,20 14,20" fill={GB} opacity=".9" />
       <polygon points="140,22 146,30 134,30" fill={G} opacity=".9" />
-      <circle cx="80" cy="80" r="5" fill={C} opacity=".6" />
+      <circle cx="80" cy="80" r="5" fill="#7DD3FC" opacity=".6" />
     </svg>
   )
 }

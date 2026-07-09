@@ -8,10 +8,10 @@ const BG = '#FFF9E8'
 
 interface RoundData { size: number; hue: number; odd: number; diff: number }
 
-function stageOf(correct: number) { return Math.min(1 + Math.floor(correct / 3), 10) }
-function gridSize(stage: number) { return Math.min(3 + Math.floor(stage / 2), 7) }
-function diffAmount(stage: number) { return Math.max(6, 22 - stage * 1.6) }
-function roundTime(stage: number) { return Math.max(2200, 5000 - stage * 260) }
+function stageOf(correct: number) { return 1 + Math.floor(correct / 3) }
+function gridSize(stage: number) { return Math.min(3 + Math.floor(stage / 2), 9) }
+function diffAmount(stage: number) { return Math.max(4, 22 - stage * 1.6) }
+function roundTime(stage: number) { return Math.max(1600, 5000 - stage * 260) }
 
 function genRound(stage: number): RoundData {
   const size = gridSize(stage)

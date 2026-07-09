@@ -12,9 +12,9 @@ const RULE_LABEL: Record<Rule, string> = { color: 'SORT BY COLOR', shape: 'SORT 
 
 interface Obj { color: 0 | 1; shape: 0 | 1; size: 0 | 1; born: number }
 
-function stageOf(correct: number) { return Math.min(1 + Math.floor(correct / 5), 10) }
-function objTime(stage: number) { return Math.max(750, 1900 - stage * 110) }
-function switchEvery(stage: number) { return Math.max(3, 6 - Math.floor(stage / 3)) }
+function stageOf(correct: number) { return 1 + Math.floor(correct / 5) }
+function objTime(stage: number) { return Math.max(550, 1900 - stage * 110) }
+function switchEvery(stage: number) { return Math.max(2, 6 - Math.floor(stage / 3)) }
 
 function genObj(): Obj {
   return { color: Math.random() < 0.5 ? 0 : 1, shape: Math.random() < 0.5 ? 0 : 1, size: Math.random() < 0.5 ? 0 : 1, born: Date.now() }
