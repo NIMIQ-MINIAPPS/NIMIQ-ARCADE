@@ -4,7 +4,6 @@ interface IllProps { className?: string }
 
 // ── helpers ────────────────────────────────────────────────────────────────
 const BG = '#16130E'
-const C  = '#EDE0BC'   // cream
 const G  = '#D4A843'   // gold
 const GB = '#E8C84A'   // gold-bright
 const DIM = '#6B6047'  // muted
@@ -89,19 +88,28 @@ function ColorStroop({ className }: IllProps) {
 }
 
 function DualNBack({ className }: IllProps) {
-  const seq = [C, G, DIM, GB, C, G]
+  const lit = new Set([1, 4])
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill={BG} />
-      {seq.map((col, i) => (
-        <g key={i}>
-          <circle cx={18 + i * 22} cy="38" r="9" fill={i === 5 ? col : S} stroke={col} strokeWidth="1.5" />
-          <rect x={10 + i * 22} y="54" width="16" height="16" rx="2" fill={i === 4 ? G : S} stroke={G} strokeWidth="1" opacity=".7" />
-        </g>
-      ))}
-      <text x="80" y="86" textAnchor="middle" fill={DIM} fontSize="7" fontFamily="monospace">N-BACK SEQUENCE</text>
-      <path d="M14 96 L146 96" stroke={S} strokeWidth="1" />
-      {[0,1,2].map(i => <rect key={i} x={30+i*32} y="92" width="28" height="6" rx="2" fill={i===1?G:S} />)}
+      <defs>
+        <linearGradient id="dnb-bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#FFFDF5" />
+          <stop offset="100%" stopColor="#F3ECFF" />
+        </linearGradient>
+      </defs>
+      <rect width="160" height="108" fill="url(#dnb-bg)" />
+      {Array.from({ length: 9 }, (_, i) => {
+        const col = i % 3, row = Math.floor(i / 3)
+        const isLit = lit.has(i)
+        return (
+          <rect key={i} x={45 + col * 24} y={12 + row * 24} width="20" height="20" rx="5"
+            fill={isLit ? '#C4B5FD' : '#FFFFFF'}
+            stroke={isLit ? '#A78BFA' : 'rgba(0,0,0,0.06)'} strokeWidth={isLit ? 1.5 : 1}
+            filter={isLit ? 'drop-shadow(0 0 5px rgba(196,181,253,0.7))' : 'drop-shadow(0 1px 2px rgba(0,0,0,0.05))'} />
+        )
+      })}
+      <rect x="66" y="86" width="28" height="20" rx="6" fill="#1A1A2E" />
+      <text x="80" y="100" textAnchor="middle" fontSize="12" fontWeight="900" fill="#FFF9E8" fontFamily="system-ui,sans-serif">K</text>
     </svg>
   )
 }
@@ -227,15 +235,21 @@ function FocusGrid({ className }: IllProps) {
   const cells = Array.from({ length: 25 }, (_, i) => i === 12)
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill={BG} />
+      <defs>
+        <linearGradient id="fcg-bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#EAF4FF" />
+          <stop offset="100%" stopColor="#FFF9E8" />
+        </linearGradient>
+      </defs>
+      <rect width="160" height="108" fill="url(#fcg-bg)" />
       {cells.map((odd, i) => {
         const col = i % 5, row = Math.floor(i / 5)
         return (
-          <rect key={i} x={22+col*24} y={12+row*18} width="16" height="12" rx="2"
-            fill={odd ? G : S} stroke={odd ? GB : DIM} strokeWidth={odd ? 1.5 : 0.5} />
+          <rect key={i} x={22+col*24} y={12+row*18} width="16" height="12" rx="3"
+            fill={odd ? 'hsl(210,70%,50%)' : 'hsl(210,55%,72%)'}
+            stroke={odd ? 'white' : 'none'} strokeWidth={odd ? 1.5 : 0} />
         )
       })}
-      <text x="80" y="103" textAnchor="middle" fill={DIM} fontSize="7" fontFamily="monospace">FIND THE ODD ONE</text>
     </svg>
   )
 }
@@ -243,13 +257,18 @@ function FocusGrid({ className }: IllProps) {
 function SpeedSort({ className }: IllProps) {
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill={BG} />
-      <HexPath cx={80} cy={38} r={22} fill={G} />
-      <text x="80" y="43" textAnchor="middle" fill={BG} fontSize="10" fontWeight="bold" fontFamily="monospace">SORT</text>
-      <rect x="16" y="62" width="52" height="28" rx="5" fill={S} stroke={DIM} strokeWidth="1" />
-      <rect x="92" y="62" width="52" height="28" rx="5" fill={S} stroke={G} strokeWidth="1.5" />
-      <text x="42" y="80" textAnchor="middle" fill={DIM} fontSize="9" fontFamily="monospace">ROUND</text>
-      <text x="118" y="80" textAnchor="middle" fill={G} fontSize="9" fontFamily="monospace">SHARP</text>
+      <defs>
+        <linearGradient id="spso-bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#FFF9E8" />
+          <stop offset="100%" stopColor="#FFF0F0" />
+        </linearGradient>
+      </defs>
+      <rect width="160" height="108" fill="url(#spso-bg)" />
+      <circle cx="80" cy="30" r="15" fill="#FF6B6B" opacity="0.92" />
+      <rect x="14" y="60" width="58" height="32" rx="9" fill="rgba(255,107,107,0.14)" stroke="#FF6B6B" strokeWidth="1.5" />
+      <rect x="88" y="60" width="58" height="32" rx="9" fill="rgba(76,201,240,0.14)" stroke="#4CC9F0" strokeWidth="1.5" />
+      <rect x="26" y="74" width="14" height="14" rx="3" fill="#4CC9F0" opacity="0.9" />
+      <circle cx="118" cy="81" r="7" fill="#86EFAC" opacity="0.9" />
     </svg>
   )
 }
@@ -400,20 +419,20 @@ function SnakePath({ className }: IllProps) {
 function SpaceRaid({ className }: IllProps) {
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill={BG} />
+      <rect width="160" height="108" fill="#1A0E0A" />
       {/* stars */}
       {[[20,10],[50,25],[100,8],[140,30],[30,50],[130,55],[80,40]].map(([x,y],i)=>(
-        <circle key={i} cx={x} cy={y} r="1" fill={C} opacity=".4" />
+        <circle key={i} cx={x} cy={y} r="1" fill="#FFFFFF" opacity=".5" />
       ))}
       {/* enemies */}
       {[[35,20],[80,20],[125,20],[57,38],[103,38]].map(([x,y],i)=>(
-        <path key={i} d={`M${x},${y} l-10,12 l20,0 Z`} fill={'#C46B5A'} opacity=".8" />
+        <path key={i} d={`M${x},${y} l-10,12 l20,0 Z`} fill={'#FF6B6B'} opacity=".85" />
       ))}
       {/* player */}
-      <path d="M80,88 L68,100 L92,100 Z" fill={G} />
-      <rect x="78" y="80" width="4" height="12" fill={G} />
+      <path d="M80,88 L68,100 L92,100 Z" fill="#FF9F43" />
+      <rect x="78" y="80" width="4" height="12" fill="#FF9F43" />
       {/* bullet */}
-      <rect x="79" y="56" width="2" height="18" rx="1" fill={GB} />
+      <rect x="79" y="56" width="2" height="18" rx="1" fill="#4CC9F0" />
     </svg>
   )
 }
@@ -448,19 +467,21 @@ function Breakwall({ className }: IllProps) {
 function PacMaze({ className }: IllProps) {
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill={BG} />
+      <rect width="160" height="108" fill="#0B0A14" />
       {/* maze walls */}
-      <rect x="10" y="10" width="140" height="88" rx="3" fill="none" stroke={DIM} strokeWidth="2" />
-      <rect x="30" y="10" width="2" height="35" fill={DIM} /><rect x="70" y="10" width="2" height="25" fill={DIM} />
-      <rect x="110" y="10" width="2" height="35" fill={DIM} /><rect x="30" y="63" width="2" height="35" fill={DIM} />
-      <rect x="70" y="73" width="2" height="25" fill={DIM} /><rect x="110" y="63" width="2" height="35" fill={DIM} />
-      <rect x="30" y="46" width="40" height="2" fill={DIM} /><rect x="90" y="46" width="40" height="2" fill={DIM} />
+      <rect x="10" y="10" width="140" height="88" rx="3" fill="none" stroke="#332E52" strokeWidth="2" />
+      <rect x="30" y="10" width="2" height="35" fill="#332E52" /><rect x="70" y="10" width="2" height="25" fill="#332E52" />
+      <rect x="110" y="10" width="2" height="35" fill="#332E52" /><rect x="30" y="63" width="2" height="35" fill="#332E52" />
+      <rect x="70" y="73" width="2" height="25" fill="#332E52" /><rect x="110" y="63" width="2" height="35" fill="#332E52" />
+      <rect x="30" y="46" width="40" height="2" fill="#332E52" /><rect x="90" y="46" width="40" height="2" fill="#332E52" />
       {/* dots */}
       {[[50,30],[90,30],[130,30],[50,55],[90,55],[130,55],[50,80]].map(([x,y],i)=>(
-        <circle key={i} cx={x} cy={y} r="2.5" fill={C} opacity=".6" />
+        <circle key={i} cx={x} cy={y} r="2.5" fill="#F5B942" opacity=".85" />
       ))}
+      {/* ghost */}
+      <path d="M22,72 a8,8 0 1,1 16,0 v10 l-3,-3 -3,3 -3,-3 -3,3 -4,-3 Z" fill="#FF6B6B" opacity=".9" />
       {/* pac */}
-      <path d="M115,77 L140,66 A16,16 0 1,0 140,88 Z" fill={G} />
+      <path d="M115,77 L140,66 A16,16 0 1,0 140,88 Z" fill="#F5B942" />
     </svg>
   )
 }
@@ -468,16 +489,16 @@ function PacMaze({ className }: IllProps) {
 function AsteroidField({ className }: IllProps) {
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill={BG} />
+      <rect width="160" height="108" fill="#0C0A18" />
       {/* asteroids */}
-      <polygon points="30,20 45,15 55,25 50,38 35,40 22,32" fill={S} stroke={DIM} strokeWidth="1.5" />
-      <polygon points="110,15 122,10 132,18 130,32 115,35 105,25" fill={S} stroke={DIM} strokeWidth="1.5" />
-      <polygon points="60,60 72,55 80,65 75,76 62,78 53,70" fill={S} stroke={C} strokeWidth="1" opacity=".6" />
+      <polygon points="30,20 45,15 55,25 50,38 35,40 22,32" fill="#16132A" stroke="#C4B5FD" strokeWidth="1.5" opacity=".9" />
+      <polygon points="110,15 122,10 132,18 130,32 115,35 105,25" fill="#16132A" stroke="#C4B5FD" strokeWidth="1.5" opacity=".9" />
+      <polygon points="60,60 72,55 80,65 75,76 62,78 53,70" fill="#16132A" stroke="#C4B5FD" strokeWidth="1" opacity=".6" />
       {/* ship */}
-      <polygon points="80,85 72,100 88,100" fill="none" stroke={G} strokeWidth="2" />
-      <circle cx="80" cy="85" r="3" fill={G} />
+      <polygon points="80,85 72,100 88,100" fill="none" stroke="#E9B213" strokeWidth="2" />
+      <circle cx="80" cy="85" r="3" fill="#E9B213" />
       {/* thrust */}
-      <path d="M76,100 L80,110 L84,100" fill={GB} opacity=".5" />
+      <path d="M76,100 L80,110 L84,100" fill="#FDBA74" opacity=".6" />
     </svg>
   )
 }
@@ -485,22 +506,21 @@ function AsteroidField({ className }: IllProps) {
 function FrogCross({ className }: IllProps) {
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill={BG} />
+      <rect width="160" height="108" fill="#14121E" />
       {/* road lanes */}
       {[0,1,2].map(i => (
-        <rect key={i} x="0" y={20+i*22} width="160" height="18" fill={i%2===0?S:'#1a1710'} />
+        <rect key={i} x="0" y={20+i*22} width="160" height="18" fill={i%2===0?'#1B1B2E':'#1a1710'} />
       ))}
       {/* cars */}
-      <rect x="10" y="23" width="36" height="14" rx="3" fill={'#C46B5A'} opacity=".8" />
-      <rect x="90" y="45" width="36" height="14" rx="3" fill={G} opacity=".8" />
-      <rect x="30" y="23" width="0" height="0" />
+      <rect x="10" y="23" width="36" height="14" rx="3" fill={'#FF6B6B'} opacity=".85" />
+      <rect x="90" y="45" width="36" height="14" rx="3" fill={'#A78BFA'} opacity=".85" />
       {/* logs in water */}
-      <rect x="0" y="84" width="160" height="18" fill="#1A2535" opacity=".8" />
-      <rect x="15" y="87" width="50" height="12" rx="5" fill="#4A3520" />
-      <rect x="95" y="87" width="50" height="12" rx="5" fill="#4A3520" />
+      <rect x="0" y="84" width="160" height="18" fill="#123048" opacity=".85" />
+      <rect x="15" y="87" width="50" height="12" rx="5" fill="#8B5A2B" />
+      <rect x="95" y="87" width="50" height="12" rx="5" fill="#8B5A2B" />
       {/* frog */}
-      <circle cx="80" cy="78" r="7" fill={'#7DB87A'} />
-      <circle cx="77" cy="75" r="2" fill={BG} /><circle cx="83" cy="75" r="2" fill={BG} />
+      <circle cx="80" cy="78" r="7" fill={'#86EFAC'} />
+      <circle cx="77" cy="75" r="2" fill="#14121E" /><circle cx="83" cy="75" r="2" fill="#14121E" />
     </svg>
   )
 }
@@ -677,22 +697,28 @@ function GalaxyDefenderIll({ className }: IllProps) {
 function GravitySwitch({ className }: IllProps) {
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill={BG} />
+      <defs>
+        <linearGradient id="gsw-bg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#1B1430" />
+          <stop offset="100%" stopColor="#0D0A18" />
+        </linearGradient>
+      </defs>
+      <rect width="160" height="108" fill="url(#gsw-bg)" />
       {/* spikes top */}
       {Array.from({length:8},(_,i)=>(
-        <polygon key={i} points={`${10+i*20},0 ${18+i*20},14 ${2+i*20},14`} fill={'#C46B5A'} opacity=".7" />
+        <polygon key={i} points={`${10+i*20},0 ${18+i*20},14 ${2+i*20},14`} fill={'#FF6B6B'} opacity=".8" />
       ))}
       {/* spikes bottom */}
       {Array.from({length:8},(_,i)=>(
-        <polygon key={i} points={`${10+i*20},108 ${18+i*20},94 ${2+i*20},94`} fill={'#C46B5A'} opacity=".7" />
+        <polygon key={i} points={`${10+i*20},108 ${18+i*20},94 ${2+i*20},94`} fill={'#FF6B6B'} opacity=".8" />
       ))}
       {/* corridor blocks */}
       {[[0,24],[40,28],[80,20],[120,26]].map(([x,h],i)=>(
-        <rect key={i} x={x} y={16} width="28" height={h} rx="2" fill={S} />
+        <rect key={i} x={x} y={16} width="28" height={h} rx="2" fill="#241D3E" />
       ))}
       {/* player */}
-      <rect x="72" y="48" width="16" height="16" rx="3" fill={G} />
-      <polygon points="72,52 64,56 72,60" fill={GB} opacity=".6" />
+      <rect x="72" y="48" width="16" height="16" rx="3" fill="#93DCFF" />
+      <polygon points="72,52 64,56 72,60" fill="#93DCFF" opacity=".6" />
     </svg>
   )
 }
@@ -700,17 +726,22 @@ function GravitySwitch({ className }: IllProps) {
 function NeonBlade({ className }: IllProps) {
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill={BG} />
+      <defs>
+        <linearGradient id="nb-bg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#171334" />
+          <stop offset="100%" stopColor="#0B0920" />
+        </linearGradient>
+      </defs>
+      <rect width="160" height="108" fill="url(#nb-bg)" />
       {/* objects */}
-      <circle cx="50" cy="45" r="18" fill={S} stroke={G} strokeWidth="1.5" opacity=".8" />
-      <rect x="95" cy="30" x1="95" y="30" width="28" height="28" rx="3"
-        fill={S} stroke={'#9B7EC4'} strokeWidth="1.5" />
-      <polygon points="120,72 135,58 148,78" fill={S} stroke={'#6A9BC4'} strokeWidth="1.5" />
+      <circle cx="50" cy="45" r="18" fill="#93DCFF" opacity=".9" />
+      <rect x="95" y="16" width="28" height="28" rx="3" fill="#C4B5FD" opacity=".9" />
+      <polygon points="120,72 135,58 148,78" fill="#FCA5A5" opacity=".9" />
       {/* slash */}
-      <path d="M15,90 Q80,20 145,75" stroke={GB} strokeWidth="2.5" fill="none"
+      <path d="M15,90 Q80,20 145,75" stroke="#FDE68A" strokeWidth="2.5" fill="none"
         strokeLinecap="round" opacity=".9" />
-      <path d="M15,90 Q80,20 145,75" stroke={C} strokeWidth="1" fill="none"
-        strokeLinecap="round" opacity=".3" />
+      <path d="M15,90 Q80,20 145,75" stroke="#FFFFFF" strokeWidth="1" fill="none"
+        strokeLinecap="round" opacity=".4" />
     </svg>
   )
 }
@@ -832,17 +863,17 @@ function MergeHex({ className }: IllProps) {
 function ColorPath({ className }: IllProps) {
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill={BG} />
+      <rect width="160" height="108" fill="#16130E" />
       {/* grid */}
       {Array.from({length:25},(_,i)=>{
         const col=i%5,row=Math.floor(i/5)
-        return <rect key={i} x={16+col*28} y={12+row*18} width="22" height="14" rx="2" fill={S} opacity=".6" />
+        return <rect key={i} x={16+col*28} y={12+row*18} width="22" height="14" rx="2" fill="#211D14" opacity=".8" />
       })}
       {/* paths */}
-      <polyline points="27,19 27,37 55,37 55,55 83,55" stroke={G} strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-      <polyline points="111,19 111,37 139,37 139,55 139,73" stroke={'#6A9BC4'} strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points="27,19 27,37 55,37 55,55 83,55" stroke="#FF6B6B" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points="111,19 111,37 139,37 139,55 139,73" stroke="#4ECDC4" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
       {/* endpoints */}
-      {[[27,19,G],[83,55,G],[111,19,'#6A9BC4'],[139,73,'#6A9BC4']].map(([x,y,c],i)=>(
+      {[[27,19,'#FF6B6B'],[83,55,'#FF6B6B'],[111,19,'#4ECDC4'],[139,73,'#4ECDC4']].map(([x,y,c],i)=>(
         <circle key={i} cx={x as number} cy={y as number} r="5" fill={c as string} />
       ))}
     </svg>
@@ -852,16 +883,22 @@ function ColorPath({ className }: IllProps) {
 function ShiftBlocks({ className }: IllProps) {
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill={BG} />
-      {/* target */}
-      <rect x="54" y="36" width="52" height="36" rx="3" fill="none" stroke={G} strokeWidth="1" strokeDasharray="4,3" />
+      <defs>
+        <linearGradient id="sfb-goal" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#FFE27A" /><stop offset="100%" stopColor="#F5A623" />
+        </linearGradient>
+      </defs>
+      <rect width="160" height="108" fill="#16130E" />
+      {/* exit glow */}
+      <rect x="140" y="44" width="6" height="20" rx="2" fill="#FFD54A" opacity=".8" />
       {/* blocks */}
-      <rect x="12" y="44" width="30" height="30" rx="3" fill={'#9B7EC4'} opacity=".8" />
-      <rect x="60" y="44" width="30" height="30" rx="3" fill={G} opacity=".8" />
-      <rect x="110" y="12" width="30" height="30" rx="3" fill={'#6A9BC4'} opacity=".8" />
+      <rect x="12" y="44" width="30" height="30" rx="3" fill="#3A3428" stroke="#655C46" strokeWidth="1.5" />
+      <rect x="60" y="20" width="30" height="30" rx="3" fill="#3A3428" stroke="#655C46" strokeWidth="1.5" />
+      <rect x="100" y="60" width="30" height="30" rx="3" fill="#3A3428" stroke="#655C46" strokeWidth="1.5" />
+      <rect x="55" y="58" width="60" height="26" rx="3" fill="url(#sfb-goal)" />
       {/* arrows */}
-      <path d="M46,59 L56,59 M52,54 L58,59 L52,64" stroke={C} strokeWidth="1.5" fill="none" />
-      <path d="M114,46 L114,56 M109,52 L114,58 L119,52" stroke={C} strokeWidth="1.5" fill="none" />
+      <path d="M46,72 L52,72 M49,68 L54,72 L49,76" stroke="#E8DFC8" strokeWidth="1.5" fill="none" opacity=".8" />
+      <path d="M118,72 L124,72 M121,68 L126,72 L121,76" stroke="#FFD54A" strokeWidth="1.5" fill="none" />
     </svg>
   )
 }
