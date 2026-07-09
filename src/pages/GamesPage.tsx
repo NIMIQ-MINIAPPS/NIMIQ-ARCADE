@@ -22,6 +22,7 @@ import LowPopGame from '../games/lowpop/LowPopGame'
 import PerilousPathGame from '../games/perilous/PerilousPathGame'
 import GalaxyDefenderGame from '../games/galaxy/GalaxyDefenderGame'
 import MiniSudokuGame from '../games/sudoku/MiniSudokuGame'
+import ColorStroopGame from '../games/colorstroop/ColorStroopGame'
 import { Lock, Star, Zap, ChevronRight } from 'lucide-react'
 
 const CAT_LABELS: Record<Exclude<GameCategory,'all'>, string> = {
@@ -150,6 +151,7 @@ export default function GamesPage() {
       case 'perilous-path':  return <PerilousPathGame onExit={exit} />
       case 'galaxy-defender': return <GalaxyDefenderGame onExit={exit} />
       case 'mini-sudoku':    return <MiniSudokuGame onExit={exit} />
+      case 'color-stroop':   return <ColorStroopGame onExit={exit} />
       default: return null
     }
   }

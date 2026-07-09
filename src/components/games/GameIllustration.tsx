@@ -68,22 +68,22 @@ function MemoryMatrix({ className }: IllProps) {
 }
 
 function ColorStroop({ className }: IllProps) {
-  const words = [
-    { t: 'RED',   fill: G,    x: 40,  y: 34 },
-    { t: 'BLUE',  fill: '#6A9BC4', x: 100, y: 34 },
-    { t: 'GOLD',  fill: '#C46B5A', x: 40,  y: 62 },
-    { t: 'GREEN', fill: '#7DB87A', x: 105, y: 62 },
-  ]
+  const swatches = ['#FF6B6B', '#4CC9F0', '#34D399', '#F5B942']
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill={BG} />
-      {words.map(w => (
-        <text key={w.t} x={w.x} y={w.y} fill={w.fill} fontSize="13" fontWeight="bold" fontFamily="monospace">{w.t}</text>
+      <defs>
+        <linearGradient id="cs-bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#FFF9E8" />
+          <stop offset="100%" stopColor="#FFF4E0" />
+        </linearGradient>
+        <filter id="cs-glow"><feGaussianBlur stdDeviation="2" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+      </defs>
+      <rect width="160" height="108" fill="url(#cs-bg)" />
+      <text x="80" y="46" textAnchor="middle" fontSize="26" fontWeight="900" fill="#4CC9F0" fontFamily="system-ui,sans-serif" filter="url(#cs-glow)">RED</text>
+      {swatches.map((c, i) => (
+        <rect key={i} x={26 + i * 30} y="68" width="22" height="22" rx="6" fill={c} opacity={i === 1 ? 1 : 0.85} />
       ))}
-      <rect x="20" y="74" width="55" height="16" rx="3" fill={S} />
-      <rect x="85" y="74" width="55" height="16" rx="3" fill={G} opacity=".35" />
-      <text x="47" y="85" fill={DIM} fontSize="8" textAnchor="middle" fontFamily="monospace">WORD</text>
-      <text x="112" y="85" fill={G} fontSize="8" textAnchor="middle" fontFamily="monospace">COLOR</text>
+      <rect x="53" y="66" width="28" height="28" rx="8" fill="none" stroke="#4CC9F0" strokeWidth="2" opacity="0.7" />
     </svg>
   )
 }
