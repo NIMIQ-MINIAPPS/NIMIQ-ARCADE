@@ -26,8 +26,6 @@ interface Bolt { x: number; y: number }
 interface FallingPower { x: number; y: number; type: PowerType }
 interface Particle { x: number; y: number; vx: number; vy: number; life: number; maxLife: number; color: string; r: number }
 
-let _id = 0
-
 // ── Audio ─────────────────────────────────────────────────────────────────────
 let _ac: AudioContext | null = null
 function snd(type: 'hit' | 'break' | 'obstacle' | 'powerup' | 'lose' | 'levelup' | 'over' | 'laser' | 'launch') {
@@ -166,7 +164,7 @@ export default function BreakwallGame({ onExit }: { onExit: () => void }) {
       frame.current++
       const ap = activePowers.current
       let badgesChanged = false
-      ;(['wide', 'fast', 'laser'] as PowerType[]).forEach(k => {
+      ;(['wide', 'fast', 'laser'] as const).forEach(k => {
         if (ap[k] > 0) { ap[k]--; if (ap[k] === 0) badgesChanged = true }
       })
       if (badgesChanged) syncBadges()

@@ -64,7 +64,6 @@ export default function NumberFlowGame({ onExit }: { onExit: () => void }) {
   const [problem, setProblem] = useState<Problem>(() => genProblem(null, 1))
   const [score, setScore] = useState(0)
   const [chain, setChain] = useState(0)
-  const [bestChain, setBestChain] = useState(0)
   const [timeLeft, setTimeLeft] = useState(60)
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null)
   const [barPct, setBarPct] = useState(100)
@@ -101,7 +100,7 @@ export default function NumberFlowGame({ onExit }: { onExit: () => void }) {
 
   const start = useCallback(() => {
     scoreRef.current = 0; chainRef.current = 0; bestChainRef.current = 0; lastAns.current = null
-    setScore(0); setChain(0); setBestChain(0); setTimeLeft(60); setFeedback(null); setPickedIdx(null); setMilestone(null)
+    setScore(0); setChain(0); setTimeLeft(60); setFeedback(null); setPickedIdx(null); setMilestone(null)
     isRunning.current = true
     const p = genProblem(null, 1)
     setProblem(p); startBar(1)
@@ -129,7 +128,7 @@ export default function NumberFlowGame({ onExit }: { onExit: () => void }) {
       chainRef.current++
       const c = chainRef.current
       setChain(c)
-      if (c > bestChainRef.current) { bestChainRef.current = c; setBestChain(c) }
+      if (c > bestChainRef.current) bestChainRef.current = c
       const pts = 10 * c
       scoreRef.current += pts; setScore(scoreRef.current)
       setFeedback('correct'); lastAns.current = ans
