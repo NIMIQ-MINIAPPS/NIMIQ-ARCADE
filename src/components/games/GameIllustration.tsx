@@ -109,14 +109,24 @@ function DualNBack({ className }: IllProps) {
 function NumberFlow({ className }: IllProps) {
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill={BG} />
-      <text x="80" y="42" textAnchor="middle" fill={C} fontSize="28" fontWeight="bold" fontFamily="monospace">47</text>
-      <text x="80" y="60" textAnchor="middle" fill={DIM} fontSize="11" fontFamily="monospace">+ 38 = ?</text>
-      {[65,85,95,85].map((_v, i) => (
-        <rect key={i} x={20+i*32} y="72" width="28" height="18" rx="4" fill={i===0?G:S} stroke={i===0?GB:DIM} strokeWidth="1" />
-      ))}
-      {['85','75','95','83'].map((v,i)=>(
-        <text key={i} x={34+i*32} y="85" textAnchor="middle" fill={i===0?BG:DIM} fontSize="9" fontFamily="monospace">{v}</text>
+      <defs>
+        <linearGradient id="nf-bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#FFF9E8" />
+          <stop offset="100%" stopColor="#FFF4E0" />
+        </linearGradient>
+        <filter id="nf-sh"><feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="rgba(0,0,0,0.08)" /></filter>
+      </defs>
+      <rect width="160" height="108" fill="url(#nf-bg)" />
+      <text x="80" y="42" textAnchor="middle" fontSize="24" fontWeight="900" fontFamily="system-ui,sans-serif">
+        <tspan fill="#1A1A2E">4 </tspan><tspan fill="#93DCFF">+</tspan><tspan fill="#1A1A2E"> 4 </tspan><tspan fill="#CCC">= ?</tspan>
+      </text>
+      <rect x="20" y="56" width="120" height="4" rx="2" fill="rgba(0,0,0,0.08)" />
+      <rect x="20" y="56" width="82" height="4" rx="2" fill="#86EFAC" />
+      {[6, 8, 5, 10].map((v, i) => (
+        <g key={i} filter="url(#nf-sh)">
+          <rect x={18 + i * 32} y="70" width="26" height="20" rx="6" fill={i === 0 ? '#86EFAC' : 'white'} />
+          <text x={31 + i * 32} y="83.5" textAnchor="middle" fontSize="11" fontWeight="900" fill="#1A1A2E" fontFamily="system-ui,sans-serif">{v}</text>
+        </g>
       ))}
     </svg>
   )
@@ -410,22 +420,27 @@ function SpaceRaid({ className }: IllProps) {
 
 function Breakwall({ className }: IllProps) {
   const bricks = Array.from({ length: 18 }, (_, i) => i)
-  const colors = [G, C, '#7DB87A', '#6A9BC4', '#9B7EC4', '#C46B5A']
+  const colors = ['#93DCFF', '#C4B5FD', '#86EFAC']
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill={BG} />
+      <defs>
+        <linearGradient id="bw-bg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#1B1430" />
+          <stop offset="100%" stopColor="#0D0A18" />
+        </linearGradient>
+        <filter id="bw-glow"><feGaussianBlur stdDeviation="2.2" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+      </defs>
+      <rect width="160" height="108" fill="url(#bw-bg)" />
       {bricks.map(i => {
         const c = i % 6, r = Math.floor(i / 6)
         const broken = [2, 7, 8, 14].includes(i)
         return !broken ? (
-          <rect key={i} x={10+c*24} y={10+r*14} width="20" height="11" rx="2"
-            fill={colors[r]} opacity=".7" />
+          <rect key={i} x={10 + c * 24} y={10 + r * 14} width="20" height="11" rx="3"
+            fill={colors[r]} opacity={0.92} />
         ) : null
       })}
-      {/* ball */}
-      <circle cx="80" cy="72" r="5" fill={C} />
-      {/* paddle */}
-      <rect x="52" y="90" width="56" height="8" rx="4" fill={G} />
+      <circle cx="80" cy="72" r="5" fill="white" filter="url(#bw-glow)" />
+      <rect x="52" y="90" width="56" height="8" rx="4" fill="#FFB347" filter="url(#bw-glow)" />
     </svg>
   )
 }
@@ -493,13 +508,20 @@ function FrogCross({ className }: IllProps) {
 function PongDuel({ className }: IllProps) {
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill={BG} />
-      <line x1="80" y1="0" x2="80" y2="108" stroke={DIM} strokeWidth="1" strokeDasharray="6,5" />
-      <rect x="12" y="34" width="8" height="40" rx="3" fill={G} />
-      <rect x="140" y="24" width="8" height="40" rx="3" fill={C} opacity=".7" />
-      <circle cx="82" cy="52" r="7" fill={C} />
-      <text x="48" y="20" textAnchor="middle" fill={G} fontSize="14" fontWeight="bold" fontFamily="monospace">3</text>
-      <text x="112" y="20" textAnchor="middle" fill={C} fontSize="14" fontWeight="bold" fontFamily="monospace">2</text>
+      <defs>
+        <linearGradient id="pd-bg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#171334" />
+          <stop offset="100%" stopColor="#0E0B22" />
+        </linearGradient>
+        <filter id="pd-glow"><feGaussianBlur stdDeviation="2" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+      </defs>
+      <rect width="160" height="108" fill="url(#pd-bg)" />
+      <line x1="0" y1="54" x2="160" y2="54" stroke="rgba(255,255,255,0.1)" strokeWidth="1" strokeDasharray="6,5" />
+      <text x="80" y="38" textAnchor="middle" fill="rgba(255,255,255,0.22)" fontSize="26" fontWeight="900" fontFamily="system-ui,sans-serif">3</text>
+      <text x="80" y="86" textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="26" fontWeight="900" fontFamily="system-ui,sans-serif">5</text>
+      <rect x="36" y="16" width="34" height="7" rx="3.5" fill="#FF9F43" filter="url(#pd-glow)" />
+      <rect x="90" y="88" width="34" height="7" rx="3.5" fill="#4CC9F0" filter="url(#pd-glow)" />
+      <rect x="76" y="50" width="8" height="8" rx="2" fill="white" filter="url(#pd-glow)" />
     </svg>
   )
 }
@@ -712,18 +734,26 @@ function DodgeStorm({ className }: IllProps) {
 
 function TowerStack({ className }: IllProps) {
   const layers = [
-    { w: 80, col: G },{ w: 70, col: C },{ w: 65, col: GB },
-    { w: 55, col: G },{ w: 42, col: C },
+    { w: 80, hue: 43 }, { w: 70, hue: 52 }, { w: 65, hue: 61 },
+    { w: 55, hue: 70 }, { w: 42, hue: 79 },
   ]
   return (
     <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill={BG} />
-      {layers.map(({w,col},i)=>(
-        <rect key={i} x={(160-w)/2} y={78-i*14} width={w} height="12" rx="2" fill={col} opacity={.5+i*.1} />
+      <defs>
+        <linearGradient id="ts-bg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#2B2350" />
+          <stop offset="100%" stopColor="#120E24" />
+        </linearGradient>
+        <filter id="ts-glow"><feGaussianBlur stdDeviation="2" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+      </defs>
+      <rect width="160" height="108" fill="url(#ts-bg)" />
+      {[[16, 10, 1], [140, 18, 0.7], [30, 24, 1.2], [124, 30, 0.8]].map(([x, y, s], i) => (
+        <circle key={i} cx={x} cy={y} r={s} fill="white" opacity={0.4} />
       ))}
-      {/* moving block */}
-      <rect x="20" y="22" width="50" height="12" rx="2" fill={GB} opacity=".9" />
-      <line x1="20" y1="28" x2="130" y2="28" stroke={G} strokeWidth="0.5" strokeDasharray="4,3" />
+      {layers.map(({ w, hue }, i) => (
+        <rect key={i} x={(160 - w) / 2} y={90 - i * 15} width={w} height="13" rx="2" fill={`hsl(${hue},55%,55%)`} />
+      ))}
+      <rect x="20" y="14" width="50" height="13" rx="2" fill="#93DCFF" filter="url(#ts-glow)" />
     </svg>
   )
 }
@@ -966,9 +996,10 @@ function MiniSudokuIll({ className }: IllProps) {
           <stop offset="0%" stopColor="#F5F3FF" />
           <stop offset="100%" stopColor="#FFF8E8" />
         </linearGradient>
+        <filter id="ms-sh"><feDropShadow dx="0" dy="3" stdDeviation="4" floodColor="rgba(0,0,0,0.12)" /></filter>
       </defs>
       <rect width="160" height="108" fill="url(#ms-bg)" />
-      <g transform="translate(46,10)">
+      <g transform="translate(46,10)" filter="url(#ms-sh)">
         <rect x={-4} y={-4} width={76} height={76} rx={10} fill="#1A1A2E" />
         {vals.map((v, i) => {
           const col = i % 4, row = Math.floor(i / 4)
