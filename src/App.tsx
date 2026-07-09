@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useGameStore } from './store/useGameStore'
 import BottomNav from './components/layout/BottomNav'
@@ -7,7 +7,7 @@ import GamesPage from './pages/GamesPage'
 import OnlinePage from './pages/OnlinePage'
 import TournamentsPage from './pages/TournamentsPage'
 import ProfilePage from './pages/ProfilePage'
-import { initNimiq } from './lib/nimiq'
+import { initNimiq, isUsingMockSdk } from './lib/nimiq'
 
 const pageVariants = {
   initial: { opacity: 0, y: 8 },
@@ -17,9 +17,11 @@ const pageVariants = {
 
 export default function App() {
   const { activeTab, setNimiqAddress, setNimBalance } = useGameStore()
+  const [demoMode, setDemoMode] = useState(false)
 
   useEffect(() => {
     initNimiq().then(async (sdk) => {
+      setDemoMode(isUsingMockSdk())
       const accounts = await sdk.listAccounts()
       if (accounts[0]) {
         setNimiqAddress(accounts[0].address)
@@ -40,6 +42,14 @@ export default function App() {
 
   return (
     <div className="flex flex-col min-h-dvh relative" style={{ background: 'var(--bg)' }}>
+      {demoMode && (
+        <div
+          className="shrink-0 text-center text-[10px] font-bold tracking-widest py-1"
+          style={{ background: 'var(--nim-dark)', color: 'var(--gold)' }}
+        >
+          DEMO MODE — NOT RUNNING INSIDE NIMIQ PAY
+        </div>
+      )}
       <main className="flex-1 overflow-y-auto pb-20">
         <AnimatePresence mode="wait">
           <motion.div
