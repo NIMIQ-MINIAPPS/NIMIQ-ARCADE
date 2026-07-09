@@ -223,13 +223,13 @@ export default function TowerStackGame({ onExit }: { onExit: () => void }) {
   }, [gameLoop])
 
   useEffect(() => {
+    if (phase !== 'play') return
     const canvas = canvasRef.current
     if (!canvas) return
     const dpr = window.devicePixelRatio || 1
     canvas.width = W * dpr; canvas.height = H * dpr
     draw()
-    return () => { alive.current = false; cancelAnimationFrame(raf.current) }
-  }, [draw])
+  }, [phase, draw])
 
   useEffect(() => () => { alive.current = false; cancelAnimationFrame(raf.current) }, [])
 
