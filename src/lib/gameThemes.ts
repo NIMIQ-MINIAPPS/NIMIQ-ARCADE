@@ -285,7 +285,7 @@ const themes: Record<string, GameTheme> = {
     name: 'WORD FRESH',
     tagline: 'Catch letters, form words',
     bg: '#080C0A',
-    surface: '#10181310',
+    surface: '#101813',
     accent: '#5BAA7E',
     accentText: '#080C0A',
     gridLine: 'rgba(91,170,126,0.04)',

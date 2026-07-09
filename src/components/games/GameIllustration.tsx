@@ -928,6 +928,67 @@ function SumPath({ className }: IllProps) {
   )
 }
 
+function WordFreshIll({ className }: IllProps) {
+  const tiles = [
+    { x: 18, y: 16, l: 'W', rot: -10, col: '#93DCFF' },
+    { x: 54, y: 8, l: 'O', rot: 6, col: '#C4B5FD' },
+    { x: 92, y: 18, l: 'R', rot: -6, col: '#86EFAC' },
+    { x: 128, y: 10, l: 'D', rot: 9, col: '#FDBA74' },
+  ]
+  return (
+    <svg viewBox="0 0 160 108" className={className}>
+      <defs>
+        <linearGradient id="wf-bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#F0FFF6" />
+          <stop offset="100%" stopColor="#E8FFF4" />
+        </linearGradient>
+      </defs>
+      <rect width="160" height="108" fill="url(#wf-bg)" />
+      {tiles.map((t, i) => (
+        <g key={i} transform={`rotate(${t.rot},${t.x + 14},${t.y + 14})`} filter="drop-shadow(0 3px 6px rgba(0,0,0,0.08))">
+          <rect x={t.x} y={t.y} width={28} height={28} rx={7} fill={t.col} opacity={0.92} />
+          <text x={t.x + 14} y={t.y + 19} textAnchor="middle" fontSize="14" fontWeight="900" fill="#1A1A2E" fontFamily="system-ui,sans-serif">{t.l}</text>
+        </g>
+      ))}
+      <rect x="24" y="72" width="112" height="20" rx="10" fill="white" opacity={0.85} stroke="rgba(0,0,0,0.06)" />
+      <text x="80" y="86" textAnchor="middle" fontSize="11" fontWeight="900" fill="#5BAA7E" fontFamily="system-ui,sans-serif" letterSpacing="1">WORD</text>
+    </svg>
+  )
+}
+
+function MiniSudokuIll({ className }: IllProps) {
+  const vals = [1, 2, null, 4, 3, 4, 1, null, null, 1, 4, 3, 4, null, 2, 1]
+  const selected = 2
+  return (
+    <svg viewBox="0 0 160 108" className={className}>
+      <defs>
+        <linearGradient id="ms-bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#F5F3FF" />
+          <stop offset="100%" stopColor="#FFF8E8" />
+        </linearGradient>
+      </defs>
+      <rect width="160" height="108" fill="url(#ms-bg)" />
+      <g transform="translate(46,10)">
+        <rect x={-4} y={-4} width={76} height={76} rx={10} fill="#1A1A2E" />
+        {vals.map((v, i) => {
+          const col = i % 4, row = Math.floor(i / 4)
+          const bx = col * 17, by = row * 17
+          const isSel = i === selected
+          return (
+            <g key={i}>
+              <rect x={bx} y={by} width={15.5} height={15.5} rx={3}
+                fill={isSel ? '#FDE68A' : v !== null ? '#EFEFE8' : 'white'}
+                stroke={isSel ? '#E9B213' : 'rgba(0,0,0,0.06)'} strokeWidth={isSel ? 1.5 : 0.5} />
+              {v !== null && <text x={bx + 7.75} y={by + 11.5} textAnchor="middle" fontSize="9" fontWeight="900" fill="#1A1A2E" fontFamily="system-ui,sans-serif">{v}</text>}
+            </g>
+          )
+        })}
+      </g>
+      <text x="80" y="100" textAnchor="middle" fontSize="8" fontWeight="800" fill="#9B7EC4" fontFamily="system-ui,sans-serif" letterSpacing="1.5" opacity={0.85}>4×4 → 6×6</text>
+    </svg>
+  )
+}
+
 // ── registry ────────────────────────────────────────────────────────────────
 const ILLUSTRATIONS: Record<string, React.ComponentType<IllProps>> = {
   'memory-matrix':  MemoryMatrix,
@@ -964,6 +1025,8 @@ const ILLUSTRATIONS: Record<string, React.ComponentType<IllProps>> = {
   'light-bounce':   LightBounce,
   'sum-path':       SumPath,
   'low-pop':        LowPop,
+  'word-fresh':     WordFreshIll,
+  'mini-sudoku':    MiniSudokuIll,
 }
 
 export default function GameIllustration({ id, className }: { id: string; className?: string }) {
