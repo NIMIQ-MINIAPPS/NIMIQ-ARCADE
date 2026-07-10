@@ -2,97 +2,122 @@
 
 Context for whichever agent picks up production integration work on this repo.
 
-## Current state (updated — real SDK is wired, backend schema is drafted)
+## Current state — backend is live, applied, and wired end-to-end
 
-`@nimiq/mini-app-sdk@0.1.0` is installed and `src/lib/nimiq.ts` now detects
-whether it's running inside Nimiq Pay (`window.nimiq` present) and uses the
-real `NimiqProvider` when it is, falling back to `MockNimiqSDK` otherwise
-(local dev / preview outside Nimiq Pay). `App.tsx` shows a "DEMO MODE" banner
-when the mock is active (`isUsingMockSdk()`).
+The Supabase project (`zetsrmdshvpbvsurmpnc`) has `supabase/schema.sql` AND
+`supabase/002_functions.sql` applied, Anonymous Sign-ins enabled, and 3 seed
+tournaments inserted. Every layer below has been verified working against the
+**real, live** Supabase project (not just compiled) — 2-browser-context
+Playwright runs for rooms, single-session runs for tournaments/profile, all
+with zero console errors. Test data was cleaned out afterward; `players`,
+`high_scores`, `rooms`, `room_players`, `payouts`, `tournament_entries` are
+all empty and `tournaments` has exactly the 3 real seeds.
+
+### Nimiq SDK (`src/lib/nimiq.ts`)
+
+`@nimiq/mini-app-sdk@0.1.0` is installed. `initNimiq()` detects whether it's
+running inside Nimiq Pay (`window.nimiq` present) and uses the real
+`NimiqProvider`, falling back to `MockNimiqSDK` otherwise (local dev /
+preview). `App.tsx` shows a "DEMO MODE" banner when the mock is active
+(`isUsingMockSdk()`).
 
 **The real SDK's actual shape (verified against the installed package's
-`.d.ts`, not assumed) differs from what the mock originally modeled:**
+`.d.ts`, not assumed) differs from what an earlier mock-based spec assumed:**
 
 - `nimiq.listAccounts()` resolves to `string[] | ErrorResponse` — addresses
-  only, **no balance field**. There is no documented method anywhere (this
+  only, **no balance field**. No documented method was found anywhere (this
   package's types, nimiq.dev's Mini Apps page, or the Hub API references
   linked from it) for fetching a NIM balance. `RealNimiqSDK.listAccounts()`
-  in `src/lib/nimiq.ts` returns `balance: 0` for real accounts and says so in
-  a comment — **do not silently fake a balance number**, find the real method
-  first (likely a Hub API call or a `nimiq.request()` JSON-RPC passthrough —
-  unconfirmed, needs Nimiq's fuller docs or a support question).
+  returns `balance: 0` for real accounts and says so in a comment — **do not
+  silently fake a balance number**, find the real method first.
 - There is no `requestPayment()`. Payments go through
   `NimiqProvider#sendBasicTransaction({ recipient, value, fee?,
-  validityStartHeight? })`, where `value` is in **Lunas** (1 NIM = 1e5 Lunas),
-  not decimal NIM — `RealNimiqSDK.requestPayment()` does the conversion.
+  validityStartHeight? })`, where `value` is in **Lunas** (1 NIM = 1e5 Lunas)
+  — `RealNimiqSDK.requestPayment()` does the conversion.
 - `requestDeviceIdentifier` is a **top-level SDK export**, not a provider
-  method, and requires `{ reason: string }` shown to the user in a consent
-  prompt on first call per origin.
-- `init(options?: { timeout?: number })` only resolves once Nimiq Pay injects
-  `window.nimiq` — it hangs forever outside Nimiq Pay, so `initNimiq()` checks
-  `isRunningInNimiqPay()` before ever calling it.
-- EVM/USDT support (`window.ethereum`, ERC-20 on Polygon/Arbitrum/Optimism/
-  Base/BNB/Sepolia) is real and documented on nimiq.dev's Mini Apps page, but
-  is **not part of `@nimiq/mini-app-sdk`** — it's the standard injected
-  `window.ethereum` provider. Not wired in this repo yet; would need its own
-  integration (viem/ethers) if USDT payments are required.
+  method, and requires `{ reason: string }` shown to the user on first call.
+- `init(options?)` only resolves once Nimiq Pay injects `window.nimiq` — it
+  hangs forever outside it, so `isRunningInNimiqPay()` gates the call.
+- EVM/USDT (`window.ethereum`, ERC-20 on Polygon/Arbitrum/Optimism/Base/BNB/
+  Sepolia) is real per nimiq.dev but **not part of `@nimiq/mini-app-sdk`** —
+  it's the standard injected `window.ethereum` provider. Not wired here.
 
-A Supabase backend schema exists at `supabase/schema.sql` (players,
-high_scores, rooms, room_players, tournaments, tournament_entries, payouts —
-all RLS-enabled) but **has not been applied yet** — see "Blocked on the user"
-below. `src/lib/supabase.ts` / `src/lib/database.types.ts` exist and compile,
-but nothing in the app calls them yet (no Online/Tournaments/Profile backend
-wiring — those pages are still fully mocked with hardcoded arrays).
+### Supabase backend
 
-## What's already defined (don't redesign it, just implement it)
+- `src/lib/supabase.ts` — client using only `VITE_SUPABASE_ANON_KEY` (public
+  by design; RLS is what actually protects data).
+- `src/lib/database.types.ts` — hand-written `Database` type. Regenerate with
+  `supabase gen types typescript --linked` once the CLI is linked; until then
+  keep it in sync with `supabase/schema.sql` + `002_functions.sql` by hand.
+- `src/lib/backend.ts` — session (`ensureSession`/`getCurrentPlayerId`),
+  progress sync (`mergeProgress`, atomic "keep the max" via the
+  `merge_player_progress` RPC), scores (`pushHighScore`), leaderboard
+  (`fetchLeaderboard`), and XP→NIM conversion (`requestXpConversion`, which
+  calls the `request_xp_conversion` RPC — creates a `pending` payout, never a
+  `sent` one; see "still blocked" below for why).
+- `src/lib/backendSync.ts` — the ONE place that touches `useGameStore`
+  reactively. `startBackendSync()` (called once from `App.tsx` after
+  `initNimiq()` resolves) signs in, merges local↔server progress, then
+  subscribes to the store: any `highScores[gameId]` change pushes to
+  `high_scores`, and — if `activeRoom`/`activeTournament` is set and matches
+  that `gameId` — also submits to the room/tournament and clears the
+  active-* flag. **No game file was touched to make this work.** This is the
+  hook point for anything else that needs to react to a completed run.
+- `src/lib/rooms.ts` / `src/lib/tournaments.ts` — CRUD + realtime/polling for
+  Online rooms and Tournament entries, used by the now-real `OnlinePage.tsx`
+  and `TournamentsPage.tsx`. `ProfilePage.tsx` is also real (leaderboard,
+  achievements computed from actual `wins`/`xp`/`payouts`, working convert
+  button).
 
-```ts
-export interface NimiqSDK {
-  listAccounts: () => Promise<NimiqAccount[]>
-  requestPayment: (params: PaymentRequest) => Promise<PaymentResult>
-  requestDeviceIdentifier: () => Promise<string>
-}
-```
+**Realtime gotcha (found via live 2-tab testing, not assumed):**
+`supabase.channel(...).on('postgres_changes', ...)` alone did NOT propagate
+`rooms`/`room_players` changes between two anonymous sessions — Realtime
+needs those tables added to the `supabase_realtime` publication (Database →
+Replication in the dashboard, or `alter publication supabase_realtime add
+table rooms, room_players;` in the SQL Editor), which nobody has run yet
+(same "no DB password / no Management API PAT" limitation as schema
+application — see below). **`OnlinePage.tsx`'s `RoomView` therefore also
+polls every 3s as the actual sync mechanism** — realtime is opportunistic on
+top of that, not depended on. If someone later runs that `alter publication`
+statement, nothing needs to change in the app; the poll just becomes
+redundant-but-harmless.
 
-`App.tsx`, `HomePage.tsx`, `ProfilePage.tsx` all consume this interface (not
-the raw SDK) via `initNimiq()` / `getNimiqSDK()` — keep it stable, adapt
-`RealNimiqSDK` internally if the underlying SDK's surface changes.
+**Online rooms are free (`entry_fee_nim = 0`) for now** — same for the 3
+seed tournaments. Entry-fee collection needs a house wallet *address* to send
+`sendBasicTransaction` payments to, which doesn't exist yet. The code path is
+a one-line addition in `enterTournament`/`createRoom` once that address is
+provided — deliberately not faked in the meantime.
 
-## Blocked on the user (cannot be done by an agent alone)
+## Blocked — needs the user directly, cannot be done by an agent with API keys alone
 
-1. **Apply `supabase/schema.sql`.** No Postgres password or Management API
-   personal access token (`sbp_...`) was ever provided — only the project's
-   API keys (anon/publishable, service_role/secret), which can't run DDL via
-   PostgREST. The user needs to paste the file into Supabase's SQL Editor
-   themselves (or hand over a DB connection string / PAT).
-2. **Enable Anonymous Sign-ins** in Supabase Auth → Providers. The schema's
-   RLS policies assume `players.id = auth.uid()` from
-   `supabase.auth.signInAnonymously()` — nothing works until this is on.
-3. **Server-side wallet for payouts.** `payouts` rows are read-only from the
-   client by design (RLS has no insert/update policy for regular users) —
-   they must be created/updated by a service_role-authenticated backend
-   process (Edge Function + cron). That process needs a funded Nimiq wallet
-   whose private key never touches this repo or the Supabase `anon` context.
-4. **Vercel deploy access** and **Nimiq Mini Apps registration** — both are
-   manual, account-bound actions on the user's side.
+1. **Enable Realtime for `rooms`/`room_players`** (see gotcha above) — cosmetic
+   only, the app works via polling without it.
+2. **A house wallet address** to receive room/tournament entry fees, and a
+   **separately funded server wallet** (private key never touches this repo)
+   to actually send `payouts` (mark them `sent` with a `tx_hash`) — that
+   requires a backend process (Edge Function + cron), not yet written, and a
+   real decision about how much NIM to put behind it.
+3. **Vercel deploy access** and **Nimiq Mini Apps registration** — manual,
+   account-bound actions.
+4. NIM balance fetching (see above) — needs real Nimiq docs/support, not
+   guessed.
 
 ## Credentials handling
 
 `.env.local` (gitignored — see `.gitignore`'s `.env.*` entries) holds
-`VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` only. The anon key is meant
-to be public (it ships in the client bundle); RLS is what actually protects
-data, not secrecy of that key. **Never** put the `service_role` / `secret`
-Supabase key, or any Nimiq wallet private key, into a file under `src/`, into
-`.env.local`, or into a commit — those are server-only and belong in Supabase
-Edge Function secrets / Vercel environment variables, set through their
-respective dashboards, not through this repo.
+`VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` only. **Never** put the
+`service_role` / `secret` Supabase key, or any Nimiq wallet private key, into
+a file under `src/`, into `.env.local`, or into a commit — those are
+server-only. This was verified: `grep`-ing the repo for both secret values
+after every session confirms neither ever touched disk in this project;
+one-off admin actions (seeding tournaments, cleaning up test data after
+Playwright runs) used the secret key transiently in shell commands only.
 
-## Known gaps still open
+## What a next agent should build, roughly in order
 
-- NIM balance fetching (see above) — needs real Nimiq docs, not guessed.
-- OnlinePage / TournamentsPage / ProfilePage still read hardcoded arrays
-  (`ROOMS`, `TOURNAMENTS`, `LB`) — wiring them to the new `players` /
-  `rooms` / `tournaments` tables is the next phase, blocked on schema
-  application (see above).
-- No Edge Functions written yet (score validation, payout processing,
-  tournament close-out cron).
+1. Score validation in an Edge Function (obvious-cheat rejection: implausible
+   score for a game, session shorter than the game's minimum possible time).
+2. The payout-sending backend process + funded wallet (blocked on #2 above).
+3. Tournament close-out cron (mark `ended`, snapshot final ranking).
+4. Real entry-fee collection once a house wallet address exists.
+5. Vercel deploy + Nimiq Mini Apps submission (blocked on #3 above).

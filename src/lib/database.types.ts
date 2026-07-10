@@ -1,7 +1,12 @@
-// Hand-written to match supabase/schema.sql exactly. Once the Supabase CLI is
-// linked to the project (`supabase login && supabase link`), regenerate with
+// Hand-written to match supabase/schema.sql + supabase/002_functions.sql exactly.
+// Once the Supabase CLI is linked to the project
+// (`supabase login && supabase link`), regenerate with
 // `supabase gen types typescript --linked > src/lib/database.types.ts` and this
-// file becomes disposable — until then, keep it in sync with schema.sql by hand.
+// file becomes disposable — until then, keep it in sync by hand.
+//
+// `Relationships: []` on every table and the empty `Views` are required to
+// satisfy supabase-js's `GenericSchema` constraint (checked against the
+// installed @supabase/supabase-js version's .d.ts) — not decorative.
 
 export interface Database {
   public: {
@@ -37,6 +42,7 @@ export interface Database {
           last_active_date?: string
         }
         Update: Partial<Database['public']['Tables']['players']['Insert']>
+        Relationships: []
       }
       high_scores: {
         Row: {
@@ -51,6 +57,7 @@ export interface Database {
           score: number
         }
         Update: Partial<Database['public']['Tables']['high_scores']['Insert']>
+        Relationships: []
       }
       rooms: {
         Row: {
@@ -73,6 +80,7 @@ export interface Database {
           status?: 'waiting' | 'playing' | 'finished'
         }
         Update: Partial<Database['public']['Tables']['rooms']['Insert']>
+        Relationships: []
       }
       room_players: {
         Row: {
@@ -89,6 +97,7 @@ export interface Database {
           finished_at?: string | null
         }
         Update: Partial<Database['public']['Tables']['room_players']['Insert']>
+        Relationships: []
       }
       tournaments: {
         Row: {
@@ -117,6 +126,7 @@ export interface Database {
           type: 'daily' | 'weekly' | 'monthly'
         }
         Update: Partial<Database['public']['Tables']['tournaments']['Insert']>
+        Relationships: []
       }
       tournament_entries: {
         Row: {
@@ -133,6 +143,7 @@ export interface Database {
           paid_tx_hash?: string | null
         }
         Update: Partial<Database['public']['Tables']['tournament_entries']['Insert']>
+        Relationships: []
       }
       payouts: {
         Row: {
@@ -153,6 +164,34 @@ export interface Database {
           status?: 'pending' | 'sent' | 'failed'
         }
         Update: Partial<Database['public']['Tables']['payouts']['Insert']>
+        Relationships: []
+      }
+    }
+    Views: Record<string, never>
+    Functions: {
+      merge_player_progress: {
+        Args: {
+          p_xp: number
+          p_level: number
+          p_wins: number
+          p_losses: number
+          p_games_played: number
+          p_daily_xp_earned: number
+          p_last_active_date: string
+          p_display_name: string
+          p_avatar: string
+          p_nimiq_address: string | null
+          p_device_identifier: string | null
+        }
+        Returns: Database['public']['Tables']['players']['Row']
+      }
+      upsert_high_score: {
+        Args: { p_game_id: string; p_score: number }
+        Returns: Database['public']['Tables']['high_scores']['Row']
+      }
+      request_xp_conversion: {
+        Args: { p_xp_amount: number }
+        Returns: Database['public']['Tables']['payouts']['Row']
       }
     }
   }

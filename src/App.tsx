@@ -8,6 +8,7 @@ import OnlinePage from './pages/OnlinePage'
 import TournamentsPage from './pages/TournamentsPage'
 import ProfilePage from './pages/ProfilePage'
 import { initNimiq, isUsingMockSdk } from './lib/nimiq'
+import { startBackendSync } from './lib/backendSync'
 
 const pageVariants = {
   initial: { opacity: 0, y: 8 },
@@ -16,19 +17,28 @@ const pageVariants = {
 }
 
 export default function App() {
-  const { activeTab, setNimiqAddress, setNimBalance } = useGameStore()
+  const { activeTab, setNimiqAddress, setNimBalance, setDeviceIdentifier } = useGameStore()
   const [demoMode, setDemoMode] = useState(false)
 
   useEffect(() => {
     initNimiq().then(async (sdk) => {
-      setDemoMode(isUsingMockSdk())
+      const mock = isUsingMockSdk()
+      setDemoMode(mock)
       const accounts = await sdk.listAccounts()
       if (accounts[0]) {
         setNimiqAddress(accounts[0].address)
         setNimBalance(accounts[0].balance)
       }
+      if (!mock) {
+        try {
+          setDeviceIdentifier(await sdk.requestDeviceIdentifier())
+        } catch (err) {
+          console.error('[App] requestDeviceIdentifier failed:', err)
+        }
+      }
+      startBackendSync()
     })
-  }, [setNimiqAddress, setNimBalance])
+  }, [setNimiqAddress, setNimBalance, setDeviceIdentifier])
 
   const renderPage = () => {
     switch (activeTab) {

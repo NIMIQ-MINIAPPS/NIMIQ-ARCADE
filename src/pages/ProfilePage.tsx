@@ -1,32 +1,70 @@
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useGameStore } from '../store/useGameStore'
 import { formatAddress } from '../lib/nimiq'
 import { xpToNim, getXpProgress } from '../lib/xp'
+import {
+  backendAvailable, getCurrentPlayerId, fetchLeaderboard, fetchMyPayouts,
+  requestXpConversion, type LeaderboardEntry, type PayoutRow,
+} from '../lib/backend'
 import XpBar from '../components/ui/XpBar'
 import NimBadge from '../components/ui/NimBadge'
 import { NimLogo, DecorHex } from '../components/ui/Hex'
-import { Trophy, Gamepad2, TrendingUp, Zap } from 'lucide-react'
+import { Trophy, Gamepad2, TrendingUp, Zap, Loader2 } from 'lucide-react'
 
-const LB = [
-  {rank:1,name:'CryptoAce',xp:48200,wins:234},
-  {rank:2,name:'NimMaster', xp:41500,wins:189},
-  {rank:3,name:'HexKing',   xp:38900,wins:176},
-  {rank:4,name:'You',       xp:0,    wins:0,  isUser:true},
-]
-const ACH = [
-  {id:'first_game',name:'First Game',  desc:'Play your first game',  unlocked:true },
-  {id:'win_10',    name:'On Fire',     desc:'Win 10 matches',        unlocked:false},
-  {id:'xp_1000',   name:'XP Grinder', desc:'Earn 1,000 XP',         unlocked:false},
-  {id:'nim_earn',  name:'Earner',      desc:'Convert XP to NIM',     unlocked:false},
-]
-const MEDAL=['#C49210','var(--nim-mid)','#8A7040']
+const MEDAL = ['#C49210', 'var(--nim-mid)', '#8A7040']
 
 export default function ProfilePage() {
   const { user, nimiqAddress } = useGameStore()
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
+  const [payouts, setPayouts] = useState<PayoutRow[]>([])
+  const [myId, setMyId] = useState<string | null>(null)
+  const [converting, setConverting] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+
+  const refresh = async () => {
+    const [lb, po, id] = await Promise.all([fetchLeaderboard(50), fetchMyPayouts(), getCurrentPlayerId()])
+    setLeaderboard(lb)
+    setPayouts(po)
+    setMyId(id)
+    setLoaded(true)
+  }
+
+  useEffect(() => {
+    if (!backendAvailable) { setLoaded(true); return }
+    refresh()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   if (!user) return null
-  const wr = user.gamesPlayed>0 ? Math.round((user.wins/user.gamesPlayed)*100) : 0
-  const {level} = getXpProgress(user.xp)
-  const lb = LB.map(e=>e.isUser ? {...e,xp:user.xp,wins:user.wins} : e)
+  const wr = user.gamesPlayed > 0 ? Math.round((user.wins / user.gamesPlayed) * 100) : 0
+  const { level } = getXpProgress(user.xp)
+
+  const hasConverted = payouts.some(p => p.reason === 'xp_conversion')
+  const achievements = [
+    { id: 'first_game', name: 'First Game', desc: 'Play your first game', unlocked: user.gamesPlayed > 0 },
+    { id: 'win_10', name: 'On Fire', desc: 'Win 10 matches', unlocked: user.wins >= 10 },
+    { id: 'xp_1000', name: 'XP Grinder', desc: 'Earn 1,000 XP', unlocked: user.xp >= 1000 },
+    { id: 'nim_earn', name: 'Earner', desc: 'Convert XP to NIM', unlocked: hasConverted },
+  ]
+
+  // Global leaderboard, with the local user's own row merged in by id (or appended if not synced yet).
+  const lbRows = myId && leaderboard.some(e => e.id === myId)
+    ? leaderboard.map(e => e.id === myId ? { ...e, displayName: user.displayName, avatar: user.avatar, xp: user.xp, wins: user.wins } : e)
+    : [...leaderboard, { id: myId ?? 'local', displayName: user.displayName, avatar: user.avatar, xp: user.xp, level, wins: user.wins }]
+  lbRows.sort((a, b) => b.xp - a.xp)
+
+  const convertibleXp = Math.min(user.xp, 5000) // don't offer converting the whole balance in one tap — keep it sane for an MVP button
+  const handleConvert = async () => {
+    if (converting || convertibleXp <= 0 || !backendAvailable) return
+    setConverting(true)
+    const payout = await requestXpConversion(convertibleXp)
+    if (payout) {
+      useGameStore.setState(s => s.user ? { user: { ...s.user, xp: s.user.xp - convertibleXp } } : {})
+      await refresh()
+    }
+    setConverting(false)
+  }
 
   return (
     <div className="flex flex-col gap-0 pb-2">
@@ -69,20 +107,48 @@ export default function ProfilePage() {
         </div>
 
         {/* NIM convertible */}
-        <div className="rounded-xl px-4 py-3 flex items-center justify-between"
-          style={{background:'var(--gold-bg)',border:'1.5px solid var(--gold)'}}>
-          <div>
-            <p className="text-[10px] tracking-widest font-semibold mb-0.5" style={{color:'var(--nim-muted)'}}>CONVERTIBLE</p>
-            <p className="font-bold" style={{color:'var(--nim-dark)'}}>{user.xp.toLocaleString()} XP</p>
+        <button
+          onClick={handleConvert}
+          disabled={converting || convertibleXp <= 0 || !backendAvailable}
+          className="w-full rounded-xl px-4 py-3 flex items-center justify-between disabled:opacity-60"
+          style={{background:'var(--gold-bg)',border:'1.5px solid var(--gold)'}}
+        >
+          <div className="text-left">
+            <p className="text-[10px] tracking-widest font-semibold mb-0.5" style={{color:'var(--nim-muted)'}}>
+              {backendAvailable ? 'TAP TO CONVERT' : 'CONVERTIBLE (backend offline)'}
+            </p>
+            <p className="font-bold" style={{color:'var(--nim-dark)'}}>{convertibleXp.toLocaleString()} XP</p>
           </div>
-          <NimBadge amount={xpToNim(user.xp)}/>
-        </div>
+          {converting ? <Loader2 size={18} className="animate-spin" style={{color:'var(--nim-dark)'}} /> : <NimBadge amount={xpToNim(convertibleXp)}/>}
+        </button>
+
+        {/* Pending / recent payouts */}
+        {payouts.length > 0 && (
+          <div className="rounded-xl p-3 space-y-1.5" style={{background:'var(--y4)',border:'1px solid var(--y2)'}}>
+            <p className="text-[10px] tracking-widest font-bold mb-1" style={{color:'var(--nim-muted)'}}>PAYOUTS</p>
+            {payouts.slice(0, 5).map(p => (
+              <div key={p.id} className="flex items-center justify-between text-[11px]">
+                <span style={{color:'var(--nim-mid)'}}>{p.reason.replace('_',' ')}</span>
+                <span className="font-bold" style={{color:'var(--nim-dark)'}}>{p.amount_nim.toFixed(3)} NIM</span>
+                <span
+                  className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                  style={{
+                    background: p.status === 'sent' ? 'var(--green-bg,rgba(39,174,96,.15))' : 'var(--y3)',
+                    color: p.status === 'sent' ? 'var(--green)' : 'var(--nim-muted)',
+                  }}
+                >
+                  {p.status.toUpperCase()}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Achievements */}
         <div>
           <p className="text-[10px] tracking-widest font-bold mb-2" style={{color:'var(--nim-muted)'}}>ACHIEVEMENTS</p>
           <div className="grid grid-cols-2 gap-2">
-            {ACH.map(a=>(
+            {achievements.map(a=>(
               <div key={a.id} className="rounded-xl p-3 flex items-center gap-2.5"
                 style={{
                   background:'var(--y4)', opacity:a.unlocked?1:.45,
@@ -103,29 +169,40 @@ export default function ProfilePage() {
 
         {/* Leaderboard */}
         <div>
-          <p className="text-[10px] tracking-widest font-bold mb-2" style={{color:'var(--nim-muted)'}}>LEADERBOARD</p>
+          <p className="text-[10px] tracking-widest font-bold mb-2" style={{color:'var(--nim-muted)'}}>
+            LEADERBOARD {!backendAvailable && '(offline)'}
+          </p>
           <div className="rounded-2xl overflow-hidden"
             style={{background:'var(--y4)',border:'1.5px solid var(--y2)'}}>
-            {lb.map((e,i)=>(
-              <div key={e.rank} className="flex items-center gap-3 px-4 py-3"
-                style={{
-                  borderBottom:i<lb.length-1?'1px solid var(--y2)':'none',
-                  background:e.isUser?'var(--gold-bg)':'transparent',
-                }}>
-                <span className="text-sm font-black w-5 text-center"
-                  style={{color:i<3?MEDAL[i]:'var(--nim-muted)'}}>{e.rank}</span>
-                <div className="flex-1">
-                  <p className="text-sm font-bold" style={{color:e.isUser?'var(--gold-dark)':'var(--nim-dark)'}}>
-                    {e.isUser?user.displayName:e.name}
-                    {e.isUser&&<span className="text-[10px] ml-1" style={{color:'var(--nim-muted)'}}>(you)</span>}
-                  </p>
-                  <p className="text-[10px]" style={{color:'var(--nim-muted)'}}>{e.wins} wins</p>
-                </div>
-                <span className="text-[11px] font-bold" style={{color:'var(--nim-mid)'}}>
-                  {e.xp.toLocaleString()} XP
-                </span>
+            {!loaded ? (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 size={18} className="animate-spin" style={{color:'var(--nim-muted)'}} />
               </div>
-            ))}
+            ) : lbRows.length === 0 ? (
+              <p className="text-center text-xs py-6" style={{color:'var(--nim-muted)'}}>No scores yet — be the first!</p>
+            ) : lbRows.map((e,i)=>{
+              const isUser = e.id === myId || (!myId && e.id === 'local')
+              return (
+                <div key={e.id} className="flex items-center gap-3 px-4 py-3"
+                  style={{
+                    borderBottom:i<lbRows.length-1?'1px solid var(--y2)':'none',
+                    background:isUser?'var(--gold-bg)':'transparent',
+                  }}>
+                  <span className="text-sm font-black w-5 text-center"
+                    style={{color:i<3?MEDAL[i]:'var(--nim-muted)'}}>{i+1}</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold" style={{color:isUser?'var(--gold-dark)':'var(--nim-dark)'}}>
+                      {e.displayName}
+                      {isUser&&<span className="text-[10px] ml-1" style={{color:'var(--nim-muted)'}}>(you)</span>}
+                    </p>
+                    <p className="text-[10px]" style={{color:'var(--nim-muted)'}}>{e.wins} wins</p>
+                  </div>
+                  <span className="text-[11px] font-bold" style={{color:'var(--nim-mid)'}}>
+                    {e.xp.toLocaleString()} XP
+                  </span>
+                </div>
+              )
+            })}
           </div>
         </div>
       </div>
