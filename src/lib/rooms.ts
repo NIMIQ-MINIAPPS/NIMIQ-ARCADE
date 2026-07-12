@@ -1,7 +1,14 @@
-// Async score-battle "Online" rooms. Players join a room, then go play the
-// room's game normally through the Games tab — roomSync.ts (hooked the same
-// way backendSync.ts hooks XP/high-score sync) watches for that game's score
-// and submits it automatically. No game file needs to know rooms exist.
+// Async score-battle "Online" rooms — a series of N rounds (default 10,
+// ~2 min each) across one or more games chosen by the host. Every round, all
+// current players go play the SAME game normally through the Games tab;
+// roomSync (hooked the same way backendSync.ts hooks XP/high-score sync)
+// watches for that game's score and submits it automatically. No game file
+// needs to know rooms exist.
+//
+// All round-advance / finalize / payout logic lives server-side in
+// supabase/003_rooms_series.sql's start_room() and submit_round_score() RPCs
+// — the client only ever calls those two functions, never writes rounds or
+// round scores directly (there's no RLS insert policy for them on purpose).
 
 import { supabase, supabaseConfigured } from './supabase'
 import type { Database } from './database.types'
@@ -10,6 +17,9 @@ export const roomsAvailable = supabaseConfigured
 
 export type RoomRow = Database['public']['Tables']['rooms']['Row']
 export type RoomPlayerRow = Database['public']['Tables']['room_players']['Row']
+export type RoomRoundRow = Database['public']['Tables']['room_rounds']['Row']
+
+export const MAX_ROOM_PLAYERS = 10
 
 export interface OpenRoom extends RoomRow {
   playerCount: number
@@ -20,6 +30,14 @@ export interface RoomPlayerWithProfile extends RoomPlayerRow {
   avatar: string
 }
 
+export interface StandingsEntry {
+  playerId: string
+  displayName: string
+  avatar: string
+  total: number
+  roundScores: Record<number, number>
+}
+
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // no 0/O/1/I/L — avoids read-aloud ambiguity
 
 function generateCode(): string {
@@ -28,21 +46,23 @@ function generateCode(): string {
   return code
 }
 
-export async function createRoom(gameId: string, maxPlayers: number, hostId: string): Promise<RoomRow | null> {
-  if (!supabase) return null
-  // Retry on the (rare) code collision — unique constraint will reject it.
+export async function createRoom(
+  gameIds: string[], maxPlayers: number, rounds: number, hostId: string, entryFeeNim = 0,
+): Promise<RoomRow | null> {
+  if (!supabase || gameIds.length === 0) return null
+  const clampedMax = Math.min(MAX_ROOM_PLAYERS, Math.max(2, maxPlayers))
   for (let attempt = 0; attempt < 5; attempt++) {
     const code = generateCode()
     const { data, error } = await supabase
       .from('rooms')
-      .insert({ code, game_id: gameId, host_id: hostId, max_players: maxPlayers })
+      .insert({ code, game_id: gameIds[0], game_ids: gameIds, host_id: hostId, max_players: clampedMax, rounds, entry_fee_nim: entryFeeNim })
       .select()
       .single()
     if (!error) {
       await supabase.from('room_players').insert({ room_id: data.id, player_id: hostId })
       return data
     }
-    if (error.code !== '23505') { // not a unique-violation — some other real error, stop retrying
+    if (error.code !== '23505') {
       console.error('[rooms] createRoom failed:', error.message)
       return null
     }
@@ -50,16 +70,30 @@ export async function createRoom(gameId: string, maxPlayers: number, hostId: str
   return null
 }
 
-export async function joinRoomByCode(code: string, playerId: string): Promise<RoomRow | null> {
+/** Read-only lookup so the caller can show/charge the entry fee BEFORE
+ * actually joining — joinRoomByCode() is the one that writes the join. */
+export async function peekRoomByCode(code: string): Promise<RoomRow | null> {
   if (!supabase) return null
-  const { data: room, error } = await supabase
+  const { data, error } = await supabase
     .from('rooms')
     .select('*')
     .eq('code', code.toUpperCase())
     .eq('status', 'waiting')
     .single()
-  if (error || !room) {
-    console.error('[rooms] joinRoomByCode: room not found or not joinable:', error?.message)
+  if (error || !data) return null
+  const { count } = await supabase
+    .from('room_players')
+    .select('*', { count: 'exact', head: true })
+    .eq('room_id', data.id)
+  if ((count ?? 0) >= data.max_players) return null
+  return data
+}
+
+export async function joinRoomByCode(code: string, playerId: string): Promise<RoomRow | null> {
+  if (!supabase) return null
+  const room = await peekRoomByCode(code)
+  if (!room) {
+    console.error('[rooms] joinRoomByCode: room not found, full, or not joinable')
     return null
   }
   const { error: joinErr } = await supabase.from('room_players').insert({ room_id: room.id, player_id: playerId })
@@ -78,7 +112,7 @@ export async function listOpenRooms(gameId?: string): Promise<OpenRoom[]> {
     .eq('status', 'waiting')
     .order('created_at', { ascending: false })
     .limit(20)
-  if (gameId) query = query.eq('game_id', gameId)
+  if (gameId) query = query.contains('game_ids', [gameId])
   const { data, error } = await query
   if (error) {
     console.error('[rooms] listOpenRooms failed:', error.message)
@@ -94,7 +128,7 @@ export async function quickMatch(gameId: string, playerId: string): Promise<Room
   const open = await listOpenRooms(gameId)
   const joinable = open.find(r => r.playerCount < r.max_players)
   if (joinable) return joinRoomByCode(joinable.code, playerId)
-  return createRoom(gameId, 4, playerId)
+  return createRoom([gameId], 4, 10, playerId)
 }
 
 export async function fetchRoomPlayers(roomId: string): Promise<RoomPlayerWithProfile[]> {
@@ -122,26 +156,54 @@ export async function fetchRoom(roomId: string): Promise<RoomRow | null> {
   return data
 }
 
-export async function startRoom(roomId: string): Promise<void> {
-  if (!supabase) return
-  const { error } = await supabase.from('rooms').update({ status: 'playing' }).eq('id', roomId)
-  if (error) console.error('[rooms] startRoom failed:', error.message)
+export async function fetchCurrentRound(roomId: string, roundNumber: number): Promise<RoomRoundRow | null> {
+  if (!supabase) return null
+  const { data, error } = await supabase
+    .from('room_rounds')
+    .select('*')
+    .eq('room_id', roomId)
+    .eq('round_number', roundNumber)
+    .maybeSingle()
+  if (error) return null
+  return data
 }
 
-export async function submitRoomScore(roomId: string, playerId: string, score: number): Promise<void> {
-  if (!supabase) return
-  const { error } = await supabase
-    .from('room_players')
-    .update({ score, finished_at: new Date().toISOString() })
-    .eq('room_id', roomId)
-    .eq('player_id', playerId)
-  if (error) console.error('[rooms] submitRoomScore failed:', error.message)
-
-  // If everyone in the room has now finished, close it out.
-  const players = await fetchRoomPlayers(roomId)
-  if (players.length > 0 && players.every(p => p.finished_at)) {
-    await supabase.from('rooms').update({ status: 'finished' }).eq('id', roomId)
+/** Sum of every round's score per player, ranked descending. */
+export async function fetchStandings(roomId: string): Promise<StandingsEntry[]> {
+  if (!supabase) return []
+  const [{ data: scores, error }, players] = await Promise.all([
+    supabase.from('room_round_scores').select('player_id, round_number, score').eq('room_id', roomId),
+    fetchRoomPlayers(roomId),
+  ])
+  if (error || !scores) return []
+  const byPlayer = new Map<string, StandingsEntry>()
+  for (const p of players) {
+    byPlayer.set(p.player_id, { playerId: p.player_id, displayName: p.displayName, avatar: p.avatar, total: 0, roundScores: {} })
   }
+  for (const s of scores) {
+    const entry = byPlayer.get(s.player_id)
+    if (!entry) continue
+    entry.roundScores[s.round_number] = s.score
+    entry.total += s.score
+  }
+  return [...byPlayer.values()].sort((a, b) => b.total - a.total)
+}
+
+export async function startRoom(roomId: string): Promise<RoomRow | null> {
+  if (!supabase) return null
+  const { data, error } = await supabase.rpc('start_room', { p_room_id: roomId })
+  if (error) { console.error('[rooms] startRoom failed:', error.message); return null }
+  return data
+}
+
+/** Submits this round's score. The RPC itself advances to the next round or
+ * finalizes the room (computing standings + queueing prize payouts) once
+ * every current player has submitted for the round. */
+export async function submitRoundScore(roomId: string, roundNumber: number, score: number): Promise<RoomRow | null> {
+  if (!supabase) return null
+  const { data, error } = await supabase.rpc('submit_round_score', { p_room_id: roomId, p_round_number: roundNumber, p_score: score })
+  if (error) { console.error('[rooms] submitRoundScore failed:', error.message); return null }
+  return data
 }
 
 export function subscribeRoom(roomId: string, onChange: () => void): () => void {
@@ -150,6 +212,7 @@ export function subscribeRoom(roomId: string, onChange: () => void): () => void 
     .channel(`room:${roomId}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'room_players', filter: `room_id=eq.${roomId}` }, onChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'room_round_scores', filter: `room_id=eq.${roomId}` }, onChange)
     .subscribe()
   return () => { supabase!.removeChannel(channel) }
 }

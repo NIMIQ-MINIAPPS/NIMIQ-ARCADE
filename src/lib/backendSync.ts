@@ -4,14 +4,20 @@
 // once from App.tsx after the Nimiq SDK has resolved (so deviceIdentifier/
 // nimiqAddress are available for the first push).
 //
-// Same hook also drives Online rooms: if the player has an `activeRoom` set
-// (OnlinePage.tsx sets it after joining a room lobby) and the next
-// setHighScore() call is for that room's gameId, that score is submitted to
-// the room automatically and activeRoom is cleared — one submission per match.
+// Same hook also drives Online rooms/Tournaments: if the player has an
+// `activeRoom`/`activeTournament` set (OnlinePage.tsx / TournamentsPage.tsx
+// set these right before sending the player off to play) and the next score
+// event is for that game, it's submitted automatically.
+//
+// This listens to `lastScoreEvent`, NOT `highScores` diffs — highScores only
+// changes on a new personal record, but a room round (or a tournament retry)
+// can legitimately end with a LOWER score than the player's all-time best,
+// and that still has to reach the room or the round would hang forever
+// waiting on this player. lastScoreEvent fires on every setHighScore() call.
 
 import { useGameStore } from '../store/useGameStore'
 import { ensureSession, mergeProgress, pushHighScore, backendAvailable } from './backend'
-import { submitRoomScore } from './rooms'
+import { submitRoundScore } from './rooms'
 import { submitTournamentScore } from './tournaments'
 
 function toISODate(input: string): string {
@@ -33,9 +39,8 @@ export async function startBackendSync(): Promise<void> {
 
   const merged = await mergeProgress({
     xp: user.xp,
+    totalXp: user.totalXp ?? user.xp,
     level: user.level,
-    wins: user.wins,
-    losses: user.losses,
     gamesPlayed: user.gamesPlayed,
     dailyXpEarned: user.dailyXpEarned,
     lastActiveDate: toISODate(user.lastActiveDate),
@@ -52,9 +57,8 @@ export async function startBackendSync(): Promise<void> {
         ...current,
         id: merged.id,
         xp: merged.xp,
+        totalXp: merged.total_xp_earned,
         level: merged.level,
-        wins: merged.wins,
-        losses: merged.losses,
         gamesPlayed: merged.games_played,
         dailyXpEarned: merged.daily_xp_earned,
         lastActiveDate: merged.last_active_date,
@@ -65,27 +69,31 @@ export async function startBackendSync(): Promise<void> {
   }
 
   let lastHighScores: Record<string, number> = { ...useGameStore.getState().highScores }
+  let lastEventNonce = useGameStore.getState().lastScoreEvent?.nonce ?? 0
   let pushTimer: ReturnType<typeof setTimeout> | null = null
 
   useGameStore.subscribe((state) => {
     for (const [gameId, score] of Object.entries(state.highScores)) {
-      if (lastHighScores[gameId] !== score) {
-        pushHighScore(gameId, score)
-
-        const room = state.activeRoom
-        if (room && room.gameId === gameId) {
-          submitRoomScore(room.roomId, playerId, score)
-          useGameStore.getState().setActiveRoom(null)
-        }
-
-        const tourney = state.activeTournament
-        if (tourney && tourney.gameId === gameId) {
-          submitTournamentScore(tourney.tournamentId, playerId, score)
-          useGameStore.getState().setActiveTournament(null)
-        }
-      }
+      if (lastHighScores[gameId] !== score) pushHighScore(gameId, score)
     }
     lastHighScores = { ...state.highScores }
+
+    const event = state.lastScoreEvent
+    if (event && event.nonce !== lastEventNonce) {
+      lastEventNonce = event.nonce
+
+      const room = state.activeRoom
+      if (room && room.gameId === event.gameId) {
+        submitRoundScore(room.roomId, room.roundNumber, event.score)
+        useGameStore.getState().setActiveRoom(null)
+      }
+
+      const tourney = state.activeTournament
+      if (tourney && tourney.gameId === event.gameId) {
+        submitTournamentScore(tourney.tournamentId, playerId, event.score)
+        useGameStore.getState().setActiveTournament(null)
+      }
+    }
 
     if (pushTimer) clearTimeout(pushTimer)
     pushTimer = setTimeout(() => {
@@ -93,9 +101,8 @@ export async function startBackendSync(): Promise<void> {
       if (!s.user) return
       mergeProgress({
         xp: s.user.xp,
+        totalXp: s.user.totalXp ?? s.user.xp,
         level: s.user.level,
-        wins: s.user.wins,
-        losses: s.user.losses,
         gamesPlayed: s.user.gamesPlayed,
         dailyXpEarned: s.user.dailyXpEarned,
         lastActiveDate: toISODate(s.user.lastActiveDate),

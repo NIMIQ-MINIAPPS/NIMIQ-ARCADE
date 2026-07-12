@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useGameStore } from '../../store/useGameStore'
 import { soundMuted } from '../../lib/gameAudio'
 import { vibrate } from '../../lib/haptics'
@@ -396,17 +397,17 @@ export default function PacMazeGame({ onExit }: { onExit: () => void }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,52px)', gridTemplateRows: 'repeat(3,52px)', gap: 4, justifyContent: 'center', padding: '8px 0 16px', flexShrink: 0 }}>
         <div />
-        <button onClick={() => setDir(UP)} style={dpadStyle}>▲</button>
+        <button onClick={() => setDir(UP)} style={dpadStyle}><ChevronUp size={22} /></button>
         <div />
-        <button onClick={() => setDir(LEFT)} style={dpadStyle}>◀</button>
+        <button onClick={() => setDir(LEFT)} style={dpadStyle}><ChevronLeft size={22} /></button>
         <div />
-        <button onClick={() => setDir(RIGHT)} style={dpadStyle}>▶</button>
+        <button onClick={() => setDir(RIGHT)} style={dpadStyle}><ChevronRight size={22} /></button>
         <div />
-        <button onClick={() => setDir(DOWN)} style={dpadStyle}>▼</button>
+        <button onClick={() => setDir(DOWN)} style={dpadStyle}><ChevronDown size={22} /></button>
         <div />
       </div>
     </div>
   )
 }
 
-const dpadStyle: React.CSSProperties = { background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 12, color: 'rgba(255,255,255,0.6)', fontSize: 18, cursor: 'pointer' }
+const dpadStyle: React.CSSProperties = { background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 12, color: 'rgba(255,255,255,0.6)', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }

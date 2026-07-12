@@ -44,13 +44,13 @@ export async function fetchMyEntry(tournamentId: string, playerId: string): Prom
   return data
 }
 
-export async function enterTournament(tournamentId: string, playerId: string): Promise<TournamentEntryRow | null> {
+export async function enterTournament(tournamentId: string, playerId: string, paidTxHash?: string): Promise<TournamentEntryRow | null> {
   if (!supabase) return null
   const existing = await fetchMyEntry(tournamentId, playerId)
   if (existing) return existing
   const { data, error } = await supabase
     .from('tournament_entries')
-    .insert({ tournament_id: tournamentId, player_id: playerId })
+    .insert({ tournament_id: tournamentId, player_id: playerId, paid_tx_hash: paidTxHash ?? null })
     .select()
     .single()
   if (error) {

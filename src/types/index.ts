@@ -3,12 +3,15 @@ export interface User {
   nimiqAddress: string
   displayName: string
   avatar: string
+  /** Spendable balance — decreases when converted to NIM. */
   xp: number
+  /** Lifetime XP ever earned — never decreases, even after converting.
+   * Ranking and level are derived from this, not from `xp`, so spending XP
+   * never costs a player their rank or their level. */
+  totalXp: number
   level: number
   totalNimEarned: number
   gamesPlayed: number
-  wins: number
-  losses: number
   dailyXpEarned: number
   lastActiveDate: string
 }

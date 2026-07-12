@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
 import { motion } from 'framer-motion'
+import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useGameStore } from '../../store/useGameStore'
 
 const BG = '#FFF9E8'
@@ -411,19 +412,19 @@ export default function SnakeGame({ onExit }: { onExit: () => void }) {
         <div style={{ display:'grid', gridTemplateColumns:'76px 76px 76px', gridTemplateRows:'72px 72px 72px', gap:6 }}>
           {/* Up */}
           <div style={{ gridColumn:2, gridRow:1 }}>
-            <DBtn label="▲" onPress={() => turn('up')} />
+            <DBtn label={<ChevronUp size={26} />} onPress={() => turn('up')} />
           </div>
           {/* Left */}
           <div style={{ gridColumn:1, gridRow:2 }}>
-            <DBtn label="◀" onPress={() => turn('left')} />
+            <DBtn label={<ChevronLeft size={26} />} onPress={() => turn('left')} />
           </div>
           {/* Right */}
           <div style={{ gridColumn:3, gridRow:2 }}>
-            <DBtn label="▶" onPress={() => turn('right')} />
+            <DBtn label={<ChevronRight size={26} />} onPress={() => turn('right')} />
           </div>
           {/* Down */}
           <div style={{ gridColumn:2, gridRow:3 }}>
-            <DBtn label="▼" onPress={() => turn('down')} />
+            <DBtn label={<ChevronDown size={26} />} onPress={() => turn('down')} />
           </div>
         </div>
       </div>
@@ -431,7 +432,7 @@ export default function SnakeGame({ onExit }: { onExit: () => void }) {
   )
 }
 
-function DBtn({ label, onPress }: { label: string; onPress: () => void }) {
+function DBtn({ label, onPress }: { label: React.ReactNode; onPress: () => void }) {
   return (
     <motion.button
       whileTap={{ scale:0.88, backgroundColor:'#E8FFE8' }}
@@ -441,6 +442,7 @@ function DBtn({ label, onPress }: { label: string; onPress: () => void }) {
         borderRadius:16, fontSize:20, cursor:'pointer',
         boxShadow:'0 2px 10px rgba(0,0,0,0.07)', color:'#444', fontWeight:800,
         touchAction:'manipulation', userSelect:'none', WebkitUserSelect:'none',
+        display:'flex', alignItems:'center', justifyContent:'center',
       }}>
       {label}
     </motion.button>

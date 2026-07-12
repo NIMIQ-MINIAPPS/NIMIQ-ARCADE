@@ -1,21 +1,93 @@
-import { motion } from 'framer-motion'
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../store/useGameStore'
-import { formatAddress, formatNim } from '../lib/nimiq'
+import { formatAddress, formatNim, getNimiqSDK } from '../lib/nimiq'
 import { xpToNim } from '../lib/xp'
+import { updateDisplayName, requestXpConversion } from '../lib/backend'
 import XpBar from '../components/ui/XpBar'
 import { NimLogo, DecorHex } from '../components/ui/Hex'
 import GameIllustration from '../components/games/GameIllustration'
 import { GAMES } from '../lib/games'
-import { ChevronRight, Zap, Gift, ArrowUpRight } from 'lucide-react'
+import { ChevronRight, Zap, Gift, ArrowUpRight, Pencil, Check, X, Loader2 } from 'lucide-react'
 
 const FEATURED = ['nimtris', 'hexfall', 'runner', 'quicktap', 'memory']
 
+function SendModal({ onClose }: { onClose: () => void }) {
+  const [recipient, setRecipient] = useState('')
+  const [amount, setAmount] = useState('')
+  const [sending, setSending] = useState(false)
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null)
+
+  const handleSend = async () => {
+    const amt = Number(amount)
+    if (!recipient.trim() || !amt || amt <= 0) return
+    setSending(true)
+    const sdk = getNimiqSDK()
+    const res = await sdk?.requestPayment({ recipient: recipient.trim(), amount: amt })
+    setSending(false)
+    if (res?.success) setResult({ ok: true, text: `Sent! ${res.txHash?.slice(0, 14)}…` })
+    else setResult({ ok: false, text: res?.error ?? 'Payment failed' })
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(31,35,72,.45)' }}
+      onClick={onClose}>
+      <motion.div initial={{ y: 40 }} animate={{ y: 0 }} exit={{ y: 40 }}
+        onClick={e => e.stopPropagation()}
+        className="w-full max-w-[430px] rounded-t-3xl p-5 space-y-3"
+        style={{ background: 'var(--y5)' }}>
+        <div className="flex items-center justify-between mb-1">
+          <p className="font-black text-sm" style={{ color: 'var(--nim-dark)' }}>SEND NIM</p>
+          <button onClick={onClose}><X size={18} style={{ color: 'var(--nim-muted)' }} /></button>
+        </div>
+        <input placeholder="Recipient address (NQ…)" value={recipient} onChange={e => setRecipient(e.target.value)}
+          className="w-full px-3 py-2.5 rounded-xl text-sm font-mono outline-none"
+          style={{ background: 'var(--y4)', border: '1px solid var(--y2)', color: 'var(--nim-dark)' }} />
+        <input placeholder="Amount (NIM)" type="number" min="0" step="0.001" value={amount} onChange={e => setAmount(e.target.value)}
+          className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+          style={{ background: 'var(--y4)', border: '1px solid var(--y2)', color: 'var(--nim-dark)' }} />
+        {result && (
+          <p className="text-[12px] font-semibold" style={{ color: result.ok ? 'var(--green)' : '#E74C3C' }}>{result.text}</p>
+        )}
+        <button onClick={handleSend} disabled={sending || !recipient.trim() || !amount}
+          className="w-full py-3 font-black rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
+          style={{ background: 'var(--nim-dark)', color: 'var(--gold)' }}>
+          {sending ? <Loader2 size={16} className="animate-spin" /> : 'CONFIRM SEND'}
+        </button>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 export default function HomePage() {
-  const { user, nimBalance, nimiqAddress, setActiveTab, highScores } = useGameStore()
+  const { user, nimBalance, nimiqAddress, setActiveTab, highScores, setUser } = useGameStore()
+  const [sendOpen, setSendOpen] = useState(false)
+  const [converting, setConverting] = useState(false)
+  const [editingName, setEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
+
   if (!user) return null
 
   const featured = FEATURED.map(id => GAMES.find(g => g.id === id)!).filter(Boolean)
-  const convertibleNim = xpToNim(user.xp)
+  const convertibleXp = Math.min(user.xp, 5000)
+
+  const startEditName = () => { setNameDraft(user.displayName); setEditingName(true) }
+  const saveName = async () => {
+    const name = nameDraft.trim().slice(0, 24)
+    if (!name) { setEditingName(false); return }
+    setUser({ ...user, displayName: name })
+    setEditingName(false)
+    await updateDisplayName(name)
+  }
+
+  const handleConvert = async () => {
+    if (converting || convertibleXp <= 0) return
+    setConverting(true)
+    const payout = await requestXpConversion(convertibleXp)
+    if (payout) setUser({ ...user, xp: user.xp - convertibleXp })
+    setConverting(false)
+  }
 
   return (
     <div className="flex flex-col gap-5 pb-2">
@@ -57,8 +129,32 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* display name */}
+        <div className="relative mt-4 flex items-center gap-1.5">
+          {editingName ? (
+            <>
+              <input
+                autoFocus
+                value={nameDraft}
+                onChange={e => setNameDraft(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') saveName(); if (e.key === 'Escape') setEditingName(false) }}
+                maxLength={24}
+                className="px-2.5 py-1 rounded-lg text-sm font-bold outline-none"
+                style={{ background: 'white', border: '1.5px solid var(--gold)', color: 'var(--nim-dark)', width: 160 }}
+              />
+              <button onClick={saveName}><Check size={16} style={{ color: 'var(--green)' }} /></button>
+              <button onClick={() => setEditingName(false)}><X size={16} style={{ color: 'var(--nim-muted)' }} /></button>
+            </>
+          ) : (
+            <button onClick={startEditName} className="flex items-center gap-1.5">
+              <span className="text-sm font-black" style={{ color: 'var(--nim-dark)' }}>{user.displayName}</span>
+              <Pencil size={11} style={{ color: 'var(--nim-muted)' }} />
+            </button>
+          )}
+        </div>
+
         {/* address pill */}
-        <div className="relative mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono"
+        <div className="relative mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono"
           style={{ background: 'rgba(255,255,255,.6)', border: '1px solid var(--y2)', color: 'var(--nim-mid)' }}>
           <svg width="8" height="8" viewBox="0 0 10 10"><polygon points="5,0.5 9.3,2.75 9.3,7.25 5,9.5 0.7,7.25 0.7,2.75" fill="var(--gold)"/></svg>
           {nimiqAddress ? formatAddress(nimiqAddress) : 'NQ07 0000…0000'}
@@ -83,6 +179,7 @@ export default function HomePage() {
               </p>
             </div>
             <button
+              onClick={() => setSendOpen(true)}
               className="flex items-center gap-1 text-xs font-bold px-3 py-2 rounded-xl"
               style={{ background: 'var(--nim-dark)', color: 'var(--gold)' }}
             >
@@ -98,32 +195,33 @@ export default function HomePage() {
                 <span className="text-[10px] tracking-widest font-bold" style={{ color: 'var(--nim-muted)' }}>EXPERIENCE</span>
               </div>
               <span className="text-[11px] font-semibold" style={{ color: 'var(--nim-mid)' }}>
-                {user.xp.toLocaleString()} XP
+                {(user.totalXp ?? user.xp).toLocaleString()} XP
               </span>
             </div>
-            <XpBar xp={user.xp} />
+            <XpBar xp={user.totalXp ?? user.xp} />
             <div className="flex items-center justify-between mt-3">
               <p className="text-[11px]" style={{ color: 'var(--nim-mid)' }}>
-                {user.xp.toLocaleString()} XP
+                {convertibleXp.toLocaleString()} XP
                 <span style={{ color: 'var(--nim-light)' }}> = </span>
-                <span className="font-bold" style={{ color: 'var(--gold-dark)' }}>{formatNim(convertibleNim)}</span>
+                <span className="font-bold" style={{ color: 'var(--gold-dark)' }}>{formatNim(xpToNim(convertibleXp))}</span>
               </p>
               <button
-                className="text-[11px] font-black px-3 py-1.5 rounded-lg glow-gold-sm"
+                onClick={handleConvert}
+                disabled={converting || convertibleXp <= 0}
+                className="text-[11px] font-black px-3 py-1.5 rounded-lg glow-gold-sm disabled:opacity-50 flex items-center gap-1.5"
                 style={{ background: 'var(--gold)', color: 'var(--nim-dark)' }}
               >
-                CONVERT
+                {converting ? <Loader2 size={12} className="animate-spin" /> : 'CONVERT'}
               </button>
             </div>
           </div>
         </motion.div>
 
         {/* stats strip */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {[
-            { label: 'PLAYED',  value: user.gamesPlayed,        color: 'var(--nim-dark)' },
-            { label: 'WINS',    value: user.wins,               color: 'var(--green)'    },
-            { label: 'XP',      value: user.xp.toLocaleString(),color: 'var(--gold-dark)'},
+            { label: 'GAMES PLAYED', value: user.gamesPlayed,        color: 'var(--nim-dark)' },
+            { label: 'TOTAL XP',     value: (user.totalXp ?? user.xp).toLocaleString(),color: 'var(--gold-dark)'},
           ].map(s => (
             <div key={s.label} className="rounded-xl px-3 py-2.5 text-center"
               style={{ background: 'var(--y4)', border: '1px solid var(--y2)' }}>
@@ -194,6 +292,10 @@ export default function HomePage() {
           ))}
         </div>
       </div>
+
+      <AnimatePresence>
+        {sendOpen && <SendModal onClose={() => setSendOpen(false)} />}
+      </AnimatePresence>
     </div>
   )
 }

@@ -37,9 +37,8 @@ export async function ensureSession(): Promise<string | null> {
 
 interface LocalProgress {
   xp: number
+  totalXp: number
   level: number
-  wins: number
-  losses: number
   gamesPlayed: number
   dailyXpEarned: number
   lastActiveDate: string
@@ -49,14 +48,17 @@ interface LocalProgress {
   deviceIdentifier: string | null
 }
 
-/** Atomic "keep the max" merge — never loses progress from either side. */
+/** Atomic "keep the max" merge — never loses progress from either side.
+ * p_wins/p_losses are hardcoded to 0: the app has no win/lose concept (every
+ * game is score-attack, the run just ends), but the RPC's signature still
+ * has those params with no default — see supabase/002_functions.sql. */
 export async function mergeProgress(p: LocalProgress): Promise<PlayerRow | null> {
   if (!supabase) return null
   const { data, error } = await supabase.rpc('merge_player_progress', {
     p_xp: p.xp,
     p_level: p.level,
-    p_wins: p.wins,
-    p_losses: p.losses,
+    p_wins: 0,
+    p_losses: 0,
     p_games_played: p.gamesPlayed,
     p_daily_xp_earned: p.dailyXpEarned,
     p_last_active_date: p.lastActiveDate,
@@ -64,6 +66,7 @@ export async function mergeProgress(p: LocalProgress): Promise<PlayerRow | null>
     p_avatar: p.avatar,
     p_nimiq_address: p.nimiqAddress,
     p_device_identifier: p.deviceIdentifier,
+    p_total_xp_earned: p.totalXp,
   })
   if (error) {
     console.error('[backend] mergeProgress failed:', error.message)
@@ -82,23 +85,34 @@ export interface LeaderboardEntry {
   id: string
   displayName: string
   avatar: string
-  xp: number
+  /** Lifetime total — this is the ranking metric, never decreases even after converting XP to NIM. */
+  totalXp: number
   level: number
-  wins: number
+  gamesPlayed: number
 }
 
 export async function fetchLeaderboard(limit = 50): Promise<LeaderboardEntry[]> {
   if (!supabase) return []
   const { data, error } = await supabase
     .from('players')
-    .select('id, display_name, avatar, xp, level, wins')
-    .order('xp', { ascending: false })
+    .select('id, display_name, avatar, total_xp_earned, level, games_played')
+    .order('total_xp_earned', { ascending: false })
     .limit(limit)
   if (error) {
     console.error('[backend] fetchLeaderboard failed:', error.message)
     return []
   }
-  return data.map(r => ({ id: r.id, displayName: r.display_name, avatar: r.avatar, xp: r.xp, level: r.level, wins: r.wins }))
+  return data.map(r => ({ id: r.id, displayName: r.display_name, avatar: r.avatar, totalXp: r.total_xp_earned, level: r.level, gamesPlayed: r.games_played }))
+}
+
+/** Lets the player rename themselves — persisted straight to their players row. */
+export async function updateDisplayName(displayName: string): Promise<boolean> {
+  if (!supabase) return false
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user) return false
+  const { error } = await supabase.from('players').update({ display_name: displayName }).eq('id', session.user.id)
+  if (error) { console.error('[backend] updateDisplayName failed:', error.message); return false }
+  return true
 }
 
 export type PayoutRow = Database['public']['Tables']['payouts']['Row']

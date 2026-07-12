@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { ArrowUp, ArrowDown } from 'lucide-react'
 import { useGameStore } from '../../store/useGameStore'
 
 const BG = '#FFF8E8'
@@ -347,14 +348,16 @@ export default function LowdownGame({ onExit }: { onExit: () => void }) {
         <motion.button whileTap={{ scale:0.95 }} onPointerDown={() => handleAnswer('higher')}
           style={{ flex:1,height:72,background:COL_HI,border:'none',borderRadius:20,
             fontSize:18,fontWeight:900,color:'#1A1A2E',cursor:'pointer',touchAction:'manipulation',
-            letterSpacing:'0.08em',boxShadow:'0 4px 16px rgba(128,237,153,0.3)' }}>
-          HIGHER ↑
+            letterSpacing:'0.08em',boxShadow:'0 4px 16px rgba(128,237,153,0.3)',
+            display:'flex',alignItems:'center',justifyContent:'center',gap:6 }}>
+          HIGHER <ArrowUp size={18} strokeWidth={3} />
         </motion.button>
         <motion.button whileTap={{ scale:0.95 }} onPointerDown={() => handleAnswer('lower')}
           style={{ flex:1,height:72,background:COL_LO,border:'none',borderRadius:20,
             fontSize:18,fontWeight:900,color:'#1A1A2E',cursor:'pointer',touchAction:'manipulation',
-            letterSpacing:'0.08em',boxShadow:'0 4px 16px rgba(255,181,194,0.3)' }}>
-          LOWER ↓
+            letterSpacing:'0.08em',boxShadow:'0 4px 16px rgba(255,181,194,0.3)',
+            display:'flex',alignItems:'center',justifyContent:'center',gap:6 }}>
+          LOWER <ArrowDown size={18} strokeWidth={3} />
         </motion.button>
       </div>
     </div>

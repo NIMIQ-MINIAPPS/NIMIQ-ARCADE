@@ -10,7 +10,7 @@ import {
 import XpBar from '../components/ui/XpBar'
 import NimBadge from '../components/ui/NimBadge'
 import { NimLogo, DecorHex } from '../components/ui/Hex'
-import { Trophy, Gamepad2, TrendingUp, Zap, Loader2 } from 'lucide-react'
+import { Gamepad2, Layers, Zap, Loader2 } from 'lucide-react'
 
 const MEDAL = ['#C49210', 'var(--nim-mid)', '#8A7040']
 
@@ -37,22 +37,24 @@ export default function ProfilePage() {
   }, [])
 
   if (!user) return null
-  const wr = user.gamesPlayed > 0 ? Math.round((user.wins / user.gamesPlayed) * 100) : 0
-  const { level } = getXpProgress(user.xp)
+  const totalXp = user.totalXp ?? user.xp
+  const { level } = getXpProgress(totalXp)
+  const gamesTried = Object.keys(useGameStore.getState().highScores).length
 
   const hasConverted = payouts.some(p => p.reason === 'xp_conversion')
   const achievements = [
     { id: 'first_game', name: 'First Game', desc: 'Play your first game', unlocked: user.gamesPlayed > 0 },
-    { id: 'win_10', name: 'On Fire', desc: 'Win 10 matches', unlocked: user.wins >= 10 },
-    { id: 'xp_1000', name: 'XP Grinder', desc: 'Earn 1,000 XP', unlocked: user.xp >= 1000 },
+    { id: 'marathon', name: 'Marathon', desc: 'Play 25 games', unlocked: user.gamesPlayed >= 25 },
+    { id: 'xp_1000', name: 'XP Grinder', desc: 'Earn 1,000 XP', unlocked: totalXp >= 1000 },
     { id: 'nim_earn', name: 'Earner', desc: 'Convert XP to NIM', unlocked: hasConverted },
   ]
 
   // Global leaderboard, with the local user's own row merged in by id (or appended if not synced yet).
+  // Ranking always uses totalXp (lifetime) — converting XP to NIM never costs a player their rank.
   const lbRows = myId && leaderboard.some(e => e.id === myId)
-    ? leaderboard.map(e => e.id === myId ? { ...e, displayName: user.displayName, avatar: user.avatar, xp: user.xp, wins: user.wins } : e)
-    : [...leaderboard, { id: myId ?? 'local', displayName: user.displayName, avatar: user.avatar, xp: user.xp, level, wins: user.wins }]
-  lbRows.sort((a, b) => b.xp - a.xp)
+    ? leaderboard.map(e => e.id === myId ? { ...e, displayName: user.displayName, avatar: user.avatar, totalXp, gamesPlayed: user.gamesPlayed } : e)
+    : [...leaderboard, { id: myId ?? 'local', displayName: user.displayName, avatar: user.avatar, totalXp, level, gamesPlayed: user.gamesPlayed }]
+  lbRows.sort((a, b) => b.totalXp - a.totalXp)
 
   const convertibleXp = Math.min(user.xp, 5000) // don't offer converting the whole balance in one tap — keep it sane for an MVP button
   const handleConvert = async () => {
@@ -82,17 +84,16 @@ export default function ProfilePage() {
             </p>
           </div>
         </div>
-        <div className="relative mt-3"><XpBar xp={user.xp} /></div>
+        <div className="relative mt-3"><XpBar xp={totalXp} /></div>
       </div>
 
       <div className="px-4 pt-4 space-y-4">
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           {[
             {icon:<Gamepad2 size={13}/>,label:'Played',  value:user.gamesPlayed,          color:'var(--blue)'},
-            {icon:<Trophy   size={13}/>,label:'Wins',    value:user.wins,                  color:'var(--green)'},
-            {icon:<TrendingUp size={13}/>,label:'Win Rate',value:`${wr}%`,                color:'var(--gold-dark)'},
-            {icon:<Zap      size={13}/>,label:'Total XP',value:user.xp.toLocaleString(), color:'var(--nim-dark)'},
+            {icon:<Layers size={13}/>,label:'Games Tried',value:gamesTried,               color:'var(--green)'},
+            {icon:<Zap      size={13}/>,label:'Total XP',value:totalXp.toLocaleString(), color:'var(--nim-dark)'},
           ].map(s=>(
             <motion.div key={s.label} initial={{opacity:0}} animate={{opacity:1}}
               className="rounded-xl p-3"
@@ -195,10 +196,10 @@ export default function ProfilePage() {
                       {e.displayName}
                       {isUser&&<span className="text-[10px] ml-1" style={{color:'var(--nim-muted)'}}>(you)</span>}
                     </p>
-                    <p className="text-[10px]" style={{color:'var(--nim-muted)'}}>{e.wins} wins</p>
+                    <p className="text-[10px]" style={{color:'var(--nim-muted)'}}>Level {e.level} · {e.gamesPlayed} games</p>
                   </div>
                   <span className="text-[11px] font-bold" style={{color:'var(--nim-mid)'}}>
-                    {e.xp.toLocaleString()} XP
+                    {e.totalXp.toLocaleString()} XP
                   </span>
                 </div>
               )

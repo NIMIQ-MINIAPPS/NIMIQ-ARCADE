@@ -9,6 +9,7 @@ import {
   tournamentsAvailable, fetchTournaments, fetchMyEntry, enterTournament, fetchRanking,
   type TournamentRow, type TournamentEntryRow, type RankedEntry,
 } from '../lib/tournaments'
+import { collectEntryFee } from '../lib/houseWallet'
 
 const TYPE_COL: Record<string, string> = { daily: 'var(--blue)', weekly: 'var(--purple)', monthly: 'var(--gold-dark)' }
 const STAT_COL: Record<string, string> = { upcoming: 'var(--gold-dark)', active: 'var(--green)', ended: 'var(--nim-muted)' }
@@ -31,6 +32,7 @@ function TournamentDetail({ t, myId, onBack }: { t: TournamentRow; myId: string;
   const [entry, setEntry] = useState<TournamentEntryRow | null>(null)
   const [ranking, setRanking] = useState<RankedEntry[]>([])
   const [entering, setEntering] = useState(false)
+  const [feeError, setFeeError] = useState<string | null>(null)
   const { setActiveTournament, setActiveTab } = useGameStore()
 
   const refresh = useCallback(async () => {
@@ -47,9 +49,12 @@ function TournamentDetail({ t, myId, onBack }: { t: TournamentRow; myId: string;
 
   const handleEnter = async () => {
     setEntering(true)
-    const e = await enterTournament(t.id, myId)
+    setFeeError(null)
+    const fee = await collectEntryFee(t.entry_fee_nim, `${t.name} entry`)
+    if (!fee.ok) { setEntering(false); setFeeError(fee.error); return }
+    const e = await enterTournament(t.id, myId, fee.txHash)
     setEntering(false)
-    if (e) setEntry(e)
+    if (e) setEntry(e); else setFeeError('Payment succeeded but entry failed to register — contact support.')
   }
 
   const goPlay = () => {
@@ -81,10 +86,13 @@ function TournamentDetail({ t, myId, onBack }: { t: TournamentRow; myId: string;
       </div>
 
       {!entry ? (
-        <button onClick={handleEnter} disabled={entering || isEnded}
-          className="w-full py-3 font-black rounded-xl disabled:opacity-40" style={{ background: 'var(--nim-dark)', color: 'var(--gold)' }}>
-          {entering ? <Loader2 size={16} className="animate-spin mx-auto" /> : isEnded ? 'ENDED' : `ENTER · ${t.entry_fee_nim} NIM`}
-        </button>
+        <>
+          <button onClick={handleEnter} disabled={entering || isEnded}
+            className="w-full py-3 font-black rounded-xl disabled:opacity-40" style={{ background: 'var(--nim-dark)', color: 'var(--gold)' }}>
+            {entering ? <Loader2 size={16} className="animate-spin mx-auto" /> : isEnded ? 'ENDED' : t.entry_fee_nim > 0 ? `ENTER · ${t.entry_fee_nim} NIM` : 'ENTER FREE'}
+          </button>
+          {feeError && <p className="text-[11px] text-center" style={{ color: '#E74C3C' }}>{feeError}</p>}
+        </>
       ) : (
         <div className="rounded-xl p-3 flex items-center justify-between" style={{ background: 'var(--gold-bg)', border: '1px solid var(--gold)' }}>
           <div>

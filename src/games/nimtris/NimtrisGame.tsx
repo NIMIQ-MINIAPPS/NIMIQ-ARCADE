@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
+import { ChevronLeft, ChevronRight, ChevronDown, RotateCw } from 'lucide-react'
 import { useGameStore } from '../../store/useGameStore'
 
 const BG = '#FFF8E8'
@@ -116,7 +117,7 @@ function StartIllustration() {
 }
 
 // ── Control button ────────────────────────────────────────────────────────────
-function Btn({ label, onPress, wide }: { label: string; onPress: () => void; wide?: boolean }) {
+function Btn({ label, onPress, wide }: { label: React.ReactNode; onPress: () => void; wide?: boolean }) {
   return (
     <motion.button
       whileTap={{ scale: 0.88 }}
@@ -128,6 +129,7 @@ function Btn({ label, onPress, wide }: { label: string; onPress: () => void; wid
         color: '#444', fontWeight: 800, letterSpacing: wide ? '0.1em' : 0,
         touchAction: 'manipulation', userSelect: 'none',
         WebkitUserSelect: 'none',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
       }}>
       {label}
     </motion.button>
@@ -471,17 +473,17 @@ export default function NimtrisGame({ onExit }: { onExit: () => void }) {
       {/* Controls */}
       <div style={{ flexShrink:0, padding:'8px 16px', paddingBottom:'max(14px, env(safe-area-inset-bottom, 14px))', display:'flex', flexDirection:'column', gap:8 }}>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
-          <Btn label="◀" onPress={() => {
+          <Btn label={<ChevronLeft size={22} />} onPress={() => {
             if (flashRef.current) return
             const p = pieceRef.current
             if (!collides(boardRef.current, p.shape, p.x-1, p.y)) { pieceRef.current = {...p,x:p.x-1}; snd('move'); draw() }
           }} />
-          <Btn label="↺" onPress={() => {
+          <Btn label={<RotateCw size={20} />} onPress={() => {
             if (flashRef.current) return
             const rot = tryRotate(boardRef.current, pieceRef.current)
             if (rot) { pieceRef.current = rot; snd('rotate'); draw() }
           }} />
-          <Btn label="▶" onPress={() => {
+          <Btn label={<ChevronRight size={22} />} onPress={() => {
             if (flashRef.current) return
             const p = pieceRef.current
             if (!collides(boardRef.current, p.shape, p.x+1, p.y)) { pieceRef.current = {...p,x:p.x+1}; snd('move'); draw() }
@@ -489,7 +491,7 @@ export default function NimtrisGame({ onExit }: { onExit: () => void }) {
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 2fr', gap:8 }}>
           <Btn label="HOLD" onPress={doHold} wide />
-          <Btn label="DROP ▼" onPress={() => {
+          <Btn label={<>DROP <ChevronDown size={16} /></>} onPress={() => {
             if (flashRef.current) return
             const p = pieceRef.current
             let ny = p.y

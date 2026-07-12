@@ -7,6 +7,7 @@ export interface ActiveRoom {
   roomId: string
   gameId: string
   code: string
+  roundNumber: number
 }
 
 export interface ActiveTournament {
@@ -39,10 +40,13 @@ interface GameStore {
   setCurrentRoomId: (id: string | null) => void
   setActiveTournament: (t: ActiveTournament | null) => void
   addXp: (amount: number) => void
-  recordWin: () => void
-  recordLoss: () => void
   highScores: Record<string, number>
   setHighScore: (gameId: string, score: number) => void
+  /** Fires on every setHighScore() call, record or not — unlike highScores
+   * (which only changes on a new record), this is how backendSync detects
+   * "a room/tournament round just ended with score N" even when N is lower
+   * than the player's all-time best for that game. */
+  lastScoreEvent: { gameId: string; score: number; nonce: number } | null
 }
 
 const defaultUser: User = {
@@ -51,11 +55,10 @@ const defaultUser: User = {
   displayName: 'Player',
   avatar: '🎮',
   xp: 0,
+  totalXp: 0,
   level: 1,
   totalNimEarned: 0,
   gamesPlayed: 0,
-  wins: 0,
-  losses: 0,
   dailyXpEarned: 0,
   lastActiveDate: new Date().toDateString(),
 }
@@ -72,6 +75,7 @@ export const useGameStore = create<GameStore>()(
       currentRoomId: null,
       activeTournament: null,
       highScores: {},
+      lastScoreEvent: null,
 
       setUser: (user) => set({ user }),
       setActiveTab: (tab) => set({ activeTab: tab }),
@@ -90,12 +94,16 @@ export const useGameStore = create<GameStore>()(
         const dailyXp = user.lastActiveDate === today ? user.dailyXpEarned : 0
         const effective = calculateDailyXpReward(dailyXp, amount)
         const newXp = user.xp + effective
+        // totalXp only ever goes up — it's what ranking/level are based on,
+        // so converting xp to NIM later never costs a player their rank.
+        const newTotalXp = (user.totalXp ?? user.xp) + effective
 
         set({
           user: {
             ...user,
             xp: newXp,
-            level: getLevelFromXp(newXp),
+            totalXp: newTotalXp,
+            level: getLevelFromXp(newTotalXp),
             dailyXpEarned: dailyXp + effective,
             lastActiveDate: today,
             gamesPlayed: user.gamesPlayed + 1,
@@ -103,23 +111,13 @@ export const useGameStore = create<GameStore>()(
         })
       },
 
-      recordWin: () => {
-        const { user } = get()
-        if (!user) return
-        set({ user: { ...user, wins: user.wins + 1 } })
-      },
-
-      recordLoss: () => {
-        const { user } = get()
-        if (!user) return
-        set({ user: { ...user, losses: user.losses + 1 } })
-      },
-
       setHighScore: (gameId, score) => {
-        const { highScores } = get()
-        if ((highScores[gameId] ?? 0) < score) {
-          set({ highScores: { ...highScores, [gameId]: score } })
-        }
+        const { highScores, lastScoreEvent } = get()
+        const isRecord = (highScores[gameId] ?? 0) < score
+        set({
+          ...(isRecord ? { highScores: { ...highScores, [gameId]: score } } : {}),
+          lastScoreEvent: { gameId, score, nonce: (lastScoreEvent?.nonce ?? 0) + 1 },
+        })
       },
     }),
     { name: 'nim-arcade-store' }

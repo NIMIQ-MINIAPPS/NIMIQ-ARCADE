@@ -26,6 +26,7 @@ export interface Database {
           daily_xp_earned: number
           last_active_date: string
           created_at: string
+          total_xp_earned: number
         }
         Insert: {
           id: string
@@ -40,6 +41,7 @@ export interface Database {
           games_played?: number
           daily_xp_earned?: number
           last_active_date?: string
+          total_xp_earned?: number
         }
         Update: Partial<Database['public']['Tables']['players']['Insert']>
         Relationships: []
@@ -69,6 +71,10 @@ export interface Database {
           entry_fee_nim: number
           status: 'waiting' | 'playing' | 'finished'
           created_at: string
+          rounds: number
+          current_round: number
+          game_ids: string[]
+          round_duration_s: number
         }
         Insert: {
           id?: string
@@ -78,6 +84,9 @@ export interface Database {
           max_players?: number
           entry_fee_nim?: number
           status?: 'waiting' | 'playing' | 'finished'
+          rounds?: number
+          game_ids: string[]
+          round_duration_s?: number
         }
         Update: Partial<Database['public']['Tables']['rooms']['Insert']>
         Relationships: []
@@ -97,6 +106,40 @@ export interface Database {
           finished_at?: string | null
         }
         Update: Partial<Database['public']['Tables']['room_players']['Insert']>
+        Relationships: []
+      }
+      room_rounds: {
+        Row: {
+          room_id: string
+          round_number: number
+          game_id: string
+          started_at: string
+          ends_at: string
+        }
+        Insert: {
+          room_id: string
+          round_number: number
+          game_id: string
+          ends_at: string
+        }
+        Update: Partial<Database['public']['Tables']['room_rounds']['Insert']>
+        Relationships: []
+      }
+      room_round_scores: {
+        Row: {
+          room_id: string
+          round_number: number
+          player_id: string
+          score: number
+          submitted_at: string
+        }
+        Insert: {
+          room_id: string
+          round_number: number
+          player_id: string
+          score?: number
+        }
+        Update: Partial<Database['public']['Tables']['room_round_scores']['Insert']>
         Relationships: []
       }
       tournaments: {
@@ -182,6 +225,7 @@ export interface Database {
           p_avatar: string
           p_nimiq_address: string | null
           p_device_identifier: string | null
+          p_total_xp_earned?: number
         }
         Returns: Database['public']['Tables']['players']['Row']
       }
@@ -192,6 +236,14 @@ export interface Database {
       request_xp_conversion: {
         Args: { p_xp_amount: number }
         Returns: Database['public']['Tables']['payouts']['Row']
+      }
+      start_room: {
+        Args: { p_room_id: string }
+        Returns: Database['public']['Tables']['rooms']['Row']
+      }
+      submit_round_score: {
+        Args: { p_room_id: string; p_round_number: number; p_score: number }
+        Returns: Database['public']['Tables']['rooms']['Row']
       }
     }
   }

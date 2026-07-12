@@ -6,14 +6,19 @@ import { useGameStore } from '../store/useGameStore'
 import { GAMES } from '../lib/games'
 import { getCurrentPlayerId } from '../lib/backend'
 import {
-  roomsAvailable, createRoom, joinRoomByCode, listOpenRooms, quickMatch,
-  fetchRoomPlayers, fetchRoom, startRoom, subscribeRoom,
-  type OpenRoom, type RoomPlayerWithProfile, type RoomRow,
+  roomsAvailable, createRoom, joinRoomByCode, peekRoomByCode, listOpenRooms, quickMatch,
+  fetchRoomPlayers, fetchRoom, fetchCurrentRound, fetchStandings, startRoom, subscribeRoom,
+  MAX_ROOM_PLAYERS,
+  type OpenRoom, type RoomPlayerWithProfile, type RoomRow, type RoomRoundRow, type StandingsEntry,
 } from '../lib/rooms'
+import { collectEntryFee } from '../lib/houseWallet'
 
 type Mode = 'quick' | 'create' | 'join'
 
 const AVAILABLE_GAMES = GAMES.filter(g => g.available)
+const ROUND_OPTIONS = [5, 10, 15, 20]
+const MAX_PLAYER_OPTIONS = [2, 4, 6, 8, MAX_ROOM_PLAYERS]
+const FEE_OPTIONS = [0, 0.5, 1, 2]
 
 const sel: React.CSSProperties = {
   background: 'var(--y4)', border: '1px solid var(--y2)',
@@ -29,39 +34,43 @@ function gameName(gameId: string) {
 function RoomView({ room, myId, onLeave }: { room: RoomRow; myId: string; onLeave: () => void }) {
   const [current, setCurrent] = useState<RoomRow>(room)
   const [players, setPlayers] = useState<RoomPlayerWithProfile[]>([])
+  const [round, setRound] = useState<RoomRoundRow | null>(null)
+  const [standings, setStandings] = useState<StandingsEntry[]>([])
   const [copied, setCopied] = useState(false)
   const { activeRoom, setActiveRoom, setActiveTab } = useGameStore()
 
   const refresh = useCallback(async () => {
-    const [r, p] = await Promise.all([fetchRoom(room.id), fetchRoomPlayers(room.id)])
-    if (r) setCurrent(r)
+    const r = await fetchRoom(room.id)
+    if (!r) return
+    setCurrent(r)
+    const [p, s] = await Promise.all([fetchRoomPlayers(room.id), fetchStandings(room.id)])
     setPlayers(p)
+    setStandings(s)
+    if (r.current_round > 0) setRound(await fetchCurrentRound(room.id, r.current_round))
   }, [room.id])
 
   useEffect(() => {
     refresh()
     const unsubscribe = subscribeRoom(room.id, refresh)
-    // Realtime needs `rooms`/`room_players` added to the supabase_realtime
-    // publication (Database → Replication in the dashboard, or
-    // `alter publication supabase_realtime add table rooms, room_players;`
-    // in the SQL Editor) — until/unless that's done, this poll is what
-    // actually keeps the lobby in sync, so it isn't optional.
+    // Realtime needs `rooms`/`room_players`/`room_round_scores` in the
+    // supabase_realtime publication — this poll is what actually keeps
+    // everyone in sync regardless of whether that's been enabled.
     const poll = setInterval(refresh, 3000)
     return () => { unsubscribe(); clearInterval(poll) }
   }, [room.id, refresh])
 
   const isHost = current.host_id === myId
-  const me = players.find(p => p.player_id === myId)
-  const iHavePlayed = !!me?.finished_at
-  const allFinished = players.length > 0 && players.every(p => p.finished_at)
-  const waitingToPlay = current.status === 'playing' && !iHavePlayed && activeRoom?.roomId !== room.id
+  const iHaveSubmittedThisRound = standings.find(s => s.playerId === myId)?.roundScores[current.current_round] != null
+  const waitingToPlay = current.status === 'playing' && !iHaveSubmittedThisRound && activeRoom?.roomId !== room.id
+  const imMidRound = current.status === 'playing' && activeRoom?.roomId === room.id
 
   const goPlay = () => {
-    setActiveRoom({ roomId: room.id, gameId: current.game_id, code: current.code })
+    if (!round) return
+    setActiveRoom({ roomId: room.id, gameId: round.game_id, code: current.code, roundNumber: current.current_round })
     setActiveTab('games')
   }
 
-  const ranked = [...players].sort((a, b) => (b.score ?? -1) - (a.score ?? -1))
+  const myRank = standings.findIndex(s => s.playerId === myId)
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
@@ -73,60 +82,80 @@ function RoomView({ room, myId, onLeave }: { room: RoomRow; myId: string; onLeav
             {copied ? <Check size={16} style={{ color: 'var(--green)' }} /> : <Copy size={16} style={{ color: 'var(--nim-muted)' }} />}
           </button>
         </div>
-        <p className="text-[12px] mt-1 font-bold" style={{ color: 'var(--nim-dark)' }}>{gameName(current.game_id)}</p>
+        <p className="text-[12px] mt-1" style={{ color: 'var(--nim-muted)' }}>
+          {current.game_ids.map(gameName).join(' · ')}
+          {current.entry_fee_nim > 0 && <span style={{ color: 'var(--gold-dark)' }}> · {current.entry_fee_nim} NIM entry</span>}
+        </p>
+        {current.status !== 'waiting' && (
+          <p className="text-[11px] font-bold mt-1" style={{ color: 'var(--gold-dark)' }}>
+            ROUND {Math.min(current.current_round, current.rounds)}/{current.rounds}
+            {round && current.status === 'playing' ? ` — ${gameName(round.game_id)}` : ''}
+          </p>
+        )}
       </div>
 
       <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--y4)', border: '1.5px solid var(--y2)' }}>
         <p className="text-[10px] tracking-widest font-bold px-4 pt-3 pb-2" style={{ color: 'var(--nim-muted)' }}>
-          PLAYERS ({players.length}/{current.max_players})
+          {current.status === 'waiting' ? `PLAYERS (${players.length}/${current.max_players})` : 'STANDINGS'}
         </p>
-        {ranked.map((p, i) => (
-          <div key={p.player_id} className="flex items-center gap-3 px-4 py-2.5" style={{ borderTop: '1px solid var(--y2)' }}>
-            {current.status === 'finished' && <span className="text-sm font-black w-4" style={{ color: i === 0 ? '#C49210' : 'var(--nim-muted)' }}>{i + 1}</span>}
-            <span className="text-lg">{p.avatar}</span>
-            <div className="flex-1">
-              <p className="text-sm font-bold" style={{ color: 'var(--nim-dark)' }}>
-                {p.displayName}{p.player_id === myId && <span className="text-[10px] ml-1" style={{ color: 'var(--nim-muted)' }}>(you)</span>}
-                {p.player_id === current.host_id && <span className="text-[9px] ml-1 px-1.5 py-0.5 rounded-full" style={{ background: 'var(--gold-bg)', color: 'var(--gold-dark)' }}>HOST</span>}
-              </p>
-            </div>
-            {p.score != null ? (
-              <span className="text-sm font-black" style={{ color: 'var(--gold-dark)' }}>{p.score.toLocaleString()}</span>
-            ) : current.status === 'playing' ? (
-              <Loader2 size={14} className="animate-spin" style={{ color: 'var(--nim-muted)' }} />
-            ) : (
-              <span className="text-[10px]" style={{ color: 'var(--nim-muted)' }}>waiting</span>
-            )}
-          </div>
-        ))}
+        {(current.status === 'waiting' ? players.map((p): StandingsEntry => ({ playerId: p.player_id, displayName: p.displayName, avatar: p.avatar, total: 0, roundScores: {} })) : standings)
+          .map((p, i) => {
+            const submitted = current.status !== 'waiting' && p.roundScores[current.current_round] != null
+            return (
+              <div key={p.playerId} className="flex items-center gap-3 px-4 py-2.5" style={{ borderTop: '1px solid var(--y2)' }}>
+                {current.status !== 'waiting' && <span className="text-sm font-black w-4" style={{ color: i === 0 ? '#C49210' : 'var(--nim-muted)' }}>{i + 1}</span>}
+                <span className="text-lg">{p.avatar}</span>
+                <div className="flex-1">
+                  <p className="text-sm font-bold" style={{ color: 'var(--nim-dark)' }}>
+                    {p.displayName}{p.playerId === myId && <span className="text-[10px] ml-1" style={{ color: 'var(--nim-muted)' }}>(you)</span>}
+                    {p.playerId === current.host_id && <span className="text-[9px] ml-1 px-1.5 py-0.5 rounded-full" style={{ background: 'var(--gold-bg)', color: 'var(--gold-dark)' }}>HOST</span>}
+                  </p>
+                </div>
+                {current.status === 'waiting' ? (
+                  <span className="text-[10px]" style={{ color: 'var(--nim-muted)' }}>ready</span>
+                ) : submitted ? (
+                  <span className="text-sm font-black" style={{ color: 'var(--gold-dark)' }}>{p.total.toLocaleString()}</span>
+                ) : (
+                  <Loader2 size={14} className="animate-spin" style={{ color: 'var(--nim-muted)' }} />
+                )}
+              </div>
+            )
+          })}
       </div>
 
       {current.status === 'waiting' && isHost && (
         <button onClick={() => startRoom(room.id)} disabled={players.length < 1}
           className="w-full py-3 font-black rounded-xl glow-gold-sm" style={{ background: 'var(--gold)', color: 'var(--nim-dark)' }}>
-          START MATCH
+          START · {current.rounds} ROUNDS
         </button>
       )}
       {current.status === 'waiting' && !isHost && (
         <p className="text-center text-[12px]" style={{ color: 'var(--nim-muted)' }}>Waiting for host to start…</p>
       )}
-      {waitingToPlay && (
+      {waitingToPlay && round && (
         <button onClick={goPlay} className="w-full py-3 font-black rounded-xl glow-gold-sm" style={{ background: 'var(--gold)', color: 'var(--nim-dark)' }}>
-          GO PLAY {gameName(current.game_id).toUpperCase()}
+          GO PLAY ROUND {current.current_round}: {gameName(round.game_id).toUpperCase()}
         </button>
       )}
-      {current.status === 'playing' && activeRoom?.roomId === room.id && (
-        <p className="text-center text-[12px] font-bold" style={{ color: 'var(--gold-dark)' }}>Playing… go finish your run, then come back here.</p>
+      {imMidRound && (
+        <p className="text-center text-[12px] font-bold" style={{ color: 'var(--gold-dark)' }}>Playing round {current.current_round}… finish your run, then come back here.</p>
       )}
-      {current.status === 'playing' && iHavePlayed && !allFinished && (
-        <p className="text-center text-[12px]" style={{ color: 'var(--nim-muted)' }}>Score submitted — waiting for the rest of the room…</p>
+      {current.status === 'playing' && iHaveSubmittedThisRound && !imMidRound && (
+        <p className="text-center text-[12px]" style={{ color: 'var(--nim-muted)' }}>Round {current.current_round} submitted — waiting for the rest of the room…</p>
       )}
-      {(current.status === 'finished' || allFinished) && (
+      {current.status === 'finished' && (
         <div className="rounded-xl p-3 flex items-center gap-2 justify-center" style={{ background: 'var(--gold-bg)', border: '1px solid var(--gold)' }}>
           <Trophy size={16} style={{ color: 'var(--gold-dark)' }} />
-          <p className="text-[12px] font-bold" style={{ color: 'var(--nim-dark)' }}>
-            {ranked[0]?.player_id === myId ? "You won this room!" : `${ranked[0]?.displayName ?? '—'} won this room.`}
-          </p>
+          <div className="text-center">
+            <p className="text-[12px] font-bold" style={{ color: 'var(--nim-dark)' }}>
+              {standings[0]?.playerId === myId ? 'You won this room!' : `${standings[0]?.displayName ?? '—'} won this room.`}
+            </p>
+            {current.entry_fee_nim > 0 && myRank >= 0 && myRank < 3 && (
+              <p className="text-[11px]" style={{ color: 'var(--gold-dark)' }}>
+                Your prize payout is queued — check Profile → Payouts.
+              </p>
+            )}
+          </div>
         </div>
       )}
 
@@ -145,17 +174,18 @@ export default function OnlinePage() {
   const [room, setRoom] = useState<RoomRow | null>(null)
   const [openRooms, setOpenRooms] = useState<OpenRoom[]>([])
   const [joinCode, setJoinCode] = useState('')
-  const [createGameId, setCreateGameId] = useState(AVAILABLE_GAMES[0]?.id ?? '')
-  const [createMax, setCreateMax] = useState(4)
+  const [createGameIds, setCreateGameIds] = useState<string[]>(AVAILABLE_GAMES[0] ? [AVAILABLE_GAMES[0].id] : [])
+  const [createMax, setCreateMax] = useState(MAX_ROOM_PLAYERS)
+  const [createRounds, setCreateRounds] = useState(10)
+  const [createFee, setCreateFee] = useState(0.5)
   const [error, setError] = useState<string | null>(null)
+  const [paying, setPaying] = useState(false)
 
   useEffect(() => { getCurrentPlayerId().then(setMyId) }, [])
   useEffect(() => {
     if (mode === 'join' && !room) listOpenRooms().then(setOpenRooms)
   }, [mode, room])
 
-  // Coming back to the Online tab after playing a room's game lands here —
-  // reattach to whatever room we were last in instead of resetting to Quick/Create/Join.
   useEffect(() => {
     if (currentRoomId && !room) fetchRoom(currentRoomId).then(r => { if (r) setRoom(r) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -165,6 +195,10 @@ export default function OnlinePage() {
 
   const enterRoom = (r: RoomRow) => { setRoom(r); setCurrentRoomId(r.id) }
   const leaveRoom = () => { setRoom(null); setCurrentRoomId(null) }
+
+  const toggleGame = (id: string) => {
+    setCreateGameIds(prev => prev.includes(id) ? prev.filter(g => g !== id) : [...prev, id])
+  }
 
   const handleQuickMatch = async () => {
     const id = await requireId()
@@ -178,16 +212,26 @@ export default function OnlinePage() {
 
   const handleCreate = async () => {
     const id = await requireId()
-    if (!id || !createGameId) return
-    const r = await createRoom(createGameId, createMax, id)
+    if (!id || createGameIds.length === 0) { setError('Pick at least one game.'); return }
+    setPaying(true)
+    const fee = await collectEntryFee(createFee, 'NIM-ARCADE room entry')
+    if (!fee.ok) { setPaying(false); setError(fee.error); return }
+    const r = await createRoom(createGameIds, createMax, createRounds, id, createFee)
+    setPaying(false)
     if (r) enterRoom(r); else setError('Could not create the room.')
   }
 
   const handleJoin = async (code: string) => {
     const id = await requireId()
     if (!id || !code) return
+    const target = await peekRoomByCode(code)
+    if (!target) { setError('Room not found, full, or already started.'); return }
+    setPaying(true)
+    const fee = await collectEntryFee(target.entry_fee_nim, 'NIM-ARCADE room entry')
+    if (!fee.ok) { setPaying(false); setError(fee.error); return }
     const r = await joinRoomByCode(code, id)
-    if (r) enterRoom(r); else setError('Room not found or already full/started.')
+    setPaying(false)
+    if (r) enterRoom(r); else setError('Room not found, full, or already started.')
   }
 
   if (!roomsAvailable) {
@@ -218,7 +262,7 @@ export default function OnlinePage() {
           <h2 className="text-xl font-black" style={{ color: 'var(--nim-dark)' }}>ONLINE</h2>
         </div>
         <p className="text-[12px] mt-0.5" style={{ color: 'var(--nim-muted)' }}>
-          Same game, same time — highest score wins the room
+          Best total across every round wins the pot — up to {MAX_ROOM_PLAYERS} players
         </p>
       </div>
 
@@ -243,7 +287,7 @@ export default function OnlinePage() {
                 <Wifi size={22} style={{ color: 'var(--nim-dark)' }} />
               </div>
               <p className="font-black mb-1" style={{ color: 'var(--nim-dark)' }}>Quick Match</p>
-              <p className="text-[12px] mb-4" style={{ color: 'var(--nim-muted)' }}>Join an open room or start one instantly</p>
+              <p className="text-[12px] mb-4" style={{ color: 'var(--nim-muted)' }}>Join an open room or start one instantly (10 rounds, one random game)</p>
               {searching ? (
                 <div className="flex flex-col items-center gap-3">
                   <div className="flex gap-2">
@@ -270,19 +314,50 @@ export default function OnlinePage() {
                 <Plus size={14} style={{ color: 'var(--gold-dark)' }} /> Create Room
               </h3>
               <div>
-                <label className="text-[10px] tracking-widest font-semibold block mb-1" style={{ color: 'var(--nim-muted)' }}>GAME</label>
-                <select style={sel} value={createGameId} onChange={e => setCreateGameId(e.target.value)}>
-                  {AVAILABLE_GAMES.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                </select>
+                <label className="text-[10px] tracking-widest font-semibold block mb-1" style={{ color: 'var(--nim-muted)' }}>
+                  GAMES ({createGameIds.length} selected — rounds rotate through them)
+                </label>
+                <div className="grid grid-cols-2 gap-1.5 max-h-40 overflow-y-auto pr-1">
+                  {AVAILABLE_GAMES.map(g => (
+                    <button key={g.id} type="button" onClick={() => toggleGame(g.id)}
+                      className="text-left px-2 py-1.5 rounded-lg text-[11px] font-semibold truncate"
+                      style={createGameIds.includes(g.id)
+                        ? { background: 'var(--nim-dark)', color: 'var(--gold)' }
+                        : { background: 'var(--y3)', color: 'var(--nim-muted)', border: '1px solid var(--y2)' }}>
+                      {g.name}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div>
-                <label className="text-[10px] tracking-widest font-semibold block mb-1" style={{ color: 'var(--nim-muted)' }}>MAX PLAYERS</label>
-                <select style={sel} value={createMax} onChange={e => setCreateMax(Number(e.target.value))}>
-                  {[2, 4, 8].map(n => <option key={n} value={n}>{n}</option>)}
-                </select>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[10px] tracking-widest font-semibold block mb-1" style={{ color: 'var(--nim-muted)' }}>ROUNDS</label>
+                  <select style={sel} value={createRounds} onChange={e => setCreateRounds(Number(e.target.value))}>
+                    {ROUND_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] tracking-widest font-semibold block mb-1" style={{ color: 'var(--nim-muted)' }}>PLAYERS</label>
+                  <select style={sel} value={createMax} onChange={e => setCreateMax(Number(e.target.value))}>
+                    {MAX_PLAYER_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] tracking-widest font-semibold block mb-1" style={{ color: 'var(--nim-muted)' }}>ENTRY</label>
+                  <select style={sel} value={createFee} onChange={e => setCreateFee(Number(e.target.value))}>
+                    {FEE_OPTIONS.map(n => <option key={n} value={n}>{n === 0 ? 'Free' : `${n} NIM`}</option>)}
+                  </select>
+                </div>
               </div>
-              <button onClick={handleCreate} className="w-full py-3 font-black rounded-xl" style={{ background: 'var(--nim-dark)', color: 'var(--gold)' }}>
-                CREATE ROOM
+              {createFee > 0 && (
+                <p className="text-[11px]" style={{ color: 'var(--nim-muted)' }}>
+                  Pool: up to {(createFee * createMax).toFixed(2)} NIM · top 3 split 70/20/10 (5% house fee)
+                </p>
+              )}
+              <button onClick={handleCreate} disabled={paying}
+                className="w-full py-3 font-black rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
+                style={{ background: 'var(--nim-dark)', color: 'var(--gold)' }}>
+                {paying ? <Loader2 size={16} className="animate-spin" /> : `CREATE ROOM${createFee > 0 ? ` · ${createFee} NIM` : ''}`}
               </button>
             </motion.div>
           )}
@@ -293,8 +368,10 @@ export default function OnlinePage() {
                 <input placeholder="Room code…" value={joinCode} maxLength={6}
                   onChange={e => setJoinCode(e.target.value.toUpperCase())}
                   className="flex-1 bg-transparent text-sm outline-none tracking-widest font-bold" style={{ color: 'var(--nim-dark)' }} />
-                <button onClick={() => handleJoin(joinCode)} className="font-black px-3 py-1.5 rounded-lg text-xs"
-                  style={{ background: 'var(--nim-dark)', color: 'var(--gold)' }}>JOIN</button>
+                <button onClick={() => handleJoin(joinCode)} disabled={paying} className="font-black px-3 py-1.5 rounded-lg text-xs disabled:opacity-50"
+                  style={{ background: 'var(--nim-dark)', color: 'var(--gold)' }}>
+                  {paying ? <Loader2 size={12} className="animate-spin" /> : 'JOIN'}
+                </button>
               </div>
 
               <p className="text-[10px] tracking-widest font-bold" style={{ color: 'var(--nim-muted)' }}>OPEN ROOMS</p>
@@ -305,13 +382,15 @@ export default function OnlinePage() {
                 <motion.div key={r.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
                   className="rounded-2xl p-4 flex items-center justify-between" style={{ background: 'var(--y4)', border: '1px solid var(--y2)' }}>
                   <div>
-                    <p className="font-black text-sm" style={{ color: 'var(--nim-dark)' }}>{gameName(r.game_id)}</p>
+                    <p className="font-black text-sm" style={{ color: 'var(--nim-dark)' }}>{r.game_ids.map(gameName).join(' · ')}</p>
                     <span className="flex items-center gap-1 text-[11px] mt-1" style={{ color: 'var(--nim-muted)' }}>
-                      <Users size={10} /> {r.playerCount}/{r.max_players} · code {r.code}
+                      <Users size={10} /> {r.playerCount}/{r.max_players} · {r.rounds} rounds · {r.entry_fee_nim > 0 ? `${r.entry_fee_nim} NIM` : 'free'} · code {r.code}
                     </span>
                   </div>
-                  <button onClick={() => handleJoin(r.code)} className="text-xs font-black px-3 py-1.5 rounded-lg"
-                    style={{ background: 'var(--gold)', color: 'var(--nim-dark)' }}>JOIN</button>
+                  <button onClick={() => handleJoin(r.code)} disabled={paying} className="text-xs font-black px-3 py-1.5 rounded-lg disabled:opacity-50"
+                    style={{ background: 'var(--gold)', color: 'var(--nim-dark)' }}>
+                    {paying ? <Loader2 size={12} className="animate-spin" /> : 'JOIN'}
+                  </button>
                 </motion.div>
               ))}
             </motion.div>
