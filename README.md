@@ -24,11 +24,11 @@ Play, earn XP, convert it to real NIM, and compete for real prizes — all insid
 
 ## What Is This
 
-NIM Arcade turns idle wallet time into play time. It's a mobile-first arcade of **31 original games** — brain trainers, classic arcade remakes, twitch-reflex action, and logic puzzles — that runs directly inside **Nimiq Pay** as a Mini App. No sign-up form, no seed phrase typed into a browser, no separate account: your Nimiq wallet *is* your identity, and every game session quietly earns you XP that converts into real NIM.
+NIM Arcade turns idle wallet time into play time. It's a mobile-first arcade of **35 original games** — brain trainers, classic arcade remakes, twitch-reflex action, and logic puzzles — that runs directly inside **Nimiq Pay** as a Mini App. No sign-up form, no seed phrase typed into a browser, no separate account: your Nimiq wallet *is* your identity, and every game session quietly earns you XP that converts into real NIM.
 
 Beyond solo play, players can open **online rooms** — real-money, multi-round tournaments for up to 10 people where the top finishers split the entry-fee pot — or enter **standing tournaments** with global, per-game leaderboards. Every payout, from XP conversions to tournament prizes, is a real on-chain NIM transaction.
 
-Everything fits inside a 430px mobile shell, is playable in under a minute per session, and is built to keep getting harder — every game scales its difficulty without a ceiling, so there's always a reason to come back and beat your own record.
+Everything fits inside a 430px mobile shell, is playable in under a minute per session, and is built to keep getting harder — every game scales its difficulty without a ceiling, so there's always a reason to come back and beat your own record. Progress is also tracked through **30 achievements** across four rarity tiers (bronze → silver → gold → legendary), each with its own badge shape, gradient, and glow.
 
 ---
 
@@ -57,13 +57,13 @@ Everything fits inside a 430px mobile shell, is playable in under a minute per s
 4. **Earn XP, not "wins."** These are infinite, high-score games with no win condition — so progress is measured in XP, with daily-diminishing conversion rates to keep the economy sustainable.
 5. **Convert XP → NIM whenever you want.** Converting spends your *redeemable* XP, but your *lifetime* XP — and therefore your rank — never goes down.
 6. **Go online.** Create or join a room (2–10 players, real NIM entry fee, one or several games, 5–20 rounds of ~2 minutes each). Best combined score across all rounds wins a cut of the pot. Or enter a standing tournament and climb a global, per-game ranking.
-7. **Get paid.** A backend job signs and broadcasts real NIM transactions to winners — no manual payout, no waiting on a human.
+7. **Get paid, instantly.** The moment a conversion or a room/tournament prize is queued, a database trigger fires the payout function immediately — no polling delay. A backend cron sweep runs every 2 minutes as a fallback in case that trigger ever misses.
 
 ---
 
 ## The Games
 
-31 games across four categories, each with infinitely escalating difficulty, local high scores, haptic + audio feedback (toggleable), and 30-second-to-3-minute sessions.
+35 games across four categories, each with infinitely escalating difficulty, local high scores, haptic + audio feedback (toggleable from anywhere in the app), and 30-second-to-3-minute sessions.
 
 <details open>
 <summary><b>🧠 Brain Training</b> (10)</summary>
@@ -84,7 +84,7 @@ Everything fits inside a 430px mobile shell, is playable in under a minute per s
 </details>
 
 <details open>
-<summary><b>🕹️ Classic Arcade</b> (9)</summary>
+<summary><b>🕹️ Classic Arcade</b> (10)</summary>
 
 | Game | Description | Difficulty |
 |---|---|:---:|
@@ -97,6 +97,7 @@ Everything fits inside a 430px mobile shell, is playable in under a minute per s
 | Pac Maze | Clear the dots, outrun the chasers | Medium |
 | Asteroid Field | Rotate, thrust, and destroy all asteroids | Medium |
 | Frog Cross | Cross the road and river without getting hit | Easy |
+| Pong Duel | Classic 1v1 paddle battle, now online | Easy |
 
 </details>
 
@@ -146,6 +147,7 @@ Full design specs for every game (visual language, animation timing, difficulty 
 | **State** | Zustand + `persist` | Client state, high scores, and preferences in `localStorage` |
 | **Rendering** | Canvas 2D + SVG | Physics-driven games (Nimtris, Runner, Space Raid…) and every game cover illustration |
 | **Backend** | Supabase (Postgres + RLS + Realtime + Edge Functions) | Identity, XP sync, leaderboards, rooms, tournaments, payouts |
+| **Automation** | `pg_cron` + `pg_net` | A database trigger fires payouts instantly on every new pending row; a cron sweep every 2 min covers any miss |
 | **Blockchain** | `@nimiq/mini-app-sdk` + `@nimiq/core` | Wallet connect, entry-fee payments, and signed NIM payouts |
 | **Hosting** | Vercel | Zero-config deploys, CI on every push to `main` |
 
@@ -153,9 +155,12 @@ Full design specs for every game (visual language, animation timing, difficulty 
 
 ## Multiplayer & Tournaments
 
-**Rooms** are the core competitive loop: a host picks one or several games, sets a real NIM entry fee, a round count (5–20 rounds), and invites up to 10 players via a room code. Each round is a ~2-minute timed match in the chosen game; scores across all rounds are summed. When every round is played, the top three finishers split the entry-fee pot (70% / 20% / 10%), and the payout is sent automatically as a real NIM transaction — no manual processing.
+**Rooms** are the core competitive loop: a host picks one or several games, sets a real NIM entry fee, a round count (5–20 rounds), and invites up to 10 players via a room code. Each round is a ~2-minute timed match in the chosen game; scores across all rounds are summed. When every round is played, the pot (entry fee × player count) pays out automatically as real NIM transactions:
 
-**Tournaments** are standing competitions with entry fees and prize pools that don't require everyone to be online at once — players enter whenever, and rankings update live.
+- **70% / 20% / 10%** of 95% of the pot goes to 1st / 2nd / 3rd place
+- The remaining **5% stays with the platform** — a real, self-funding cut, since entry fees and prize payouts both flow through the same wallet
+
+**Tournaments** are standing competitions with entry fees that don't require everyone to be online at once — players enter whenever, and rankings update live. (Prize-pool payout for tournaments, mirroring the rooms mechanic above, is on the roadmap — entries and rankings work today, automatic payout doesn't yet.)
 
 Every game also has its own **global leaderboard**, plus a single **overall ranking** across everything a player has ever earned — so casual players and specialists both have a ladder to climb.
 
@@ -169,7 +174,7 @@ NIM Arcade isn't just a game collection with a wallet bolted on — it's a low-f
 - **A concrete, playful use case for NIM's actual selling points.** Fast, cheap transactions aren't an abstract pitch here — they're the thing that makes instant entry fees, instant payouts, and daily XP-to-NIM conversion *feel* good instead of annoying. Every session is a live demo of why Nimiq's fee/speed profile matters.
 - **A built-in reason to return daily.** Diminishing XP-conversion rates past a daily threshold (see `src/lib/xp.ts`) reward regular short sessions over one-off binges — exactly the retention shape a Mini Apps ecosystem wants.
 - **A viral, social growth loop.** Rooms are shareable by room code and have real stakes; tournaments create standing competition. Both give players an organic reason to invite friends into their wallet app.
-- **Extensible inventory for partnerships.** 31 games across four genres means there's already a slot for a sponsored tournament, a branded room, or a seasonal event — without shipping new code.
+- **Extensible inventory for partnerships.** 35 games across four genres means there's already a slot for a sponsored tournament, a branded room, or a seasonal event — without shipping new code.
 - **Everything is auditable on-chain.** Entry fees, conversions, and payouts are all real NIM transactions, which makes NIM Arcade a visible, ongoing showcase of network activity rather than a walled-garden points system.
 
 ---
@@ -178,7 +183,7 @@ NIM Arcade isn't just a game collection with a wallet bolted on — it's a low-f
 
 ```
 src/
-  games/<game-id>/<Game>.tsx    31 self-contained game components
+  games/<game-id>/<Game>.tsx    35 self-contained game components
   components/
     games/GameIllustration.tsx  SVG cover art for every game, matched to its real palette
     ui/                         Shared hex-badge, XP bar, NIM badge components
@@ -192,7 +197,8 @@ src/
   store/useGameStore.ts         Zustand store: user, XP, high scores, active room/tournament
   pages/                        Home · Games · Online · Tournaments · Profile
 supabase/
-  schema.sql, 00X_*.sql         Tables, RLS policies, security-definer RPCs
+  schema.sql, 00X_*.sql         Tables, RLS policies, security-definer RPCs, the
+                                 instant-payout trigger, and pg_cron schedule
   functions/process-payouts/    Edge Function that signs and broadcasts real NIM payouts
 ```
 

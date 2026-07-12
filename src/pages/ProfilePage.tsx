@@ -113,7 +113,7 @@ export default function ProfilePage() {
     { id: 'max_level',    name: 'Max Level',       desc: 'Reach level 35',                     unlocked: level >= 35,             tier: 'legendary', icon: <InfinityIcon size={15}/> },
     { id: 'big_whale',    name: 'Mega Whale',      desc: 'Earn 5+ NIM from payouts',           unlocked: nimEarned >= 5,          tier: 'legendary', icon: <PartyPopper size={15}/> },
     { id: 'immortal',     name: 'Immortal',        desc: 'Play 1,000 games',                   unlocked: user.gamesPlayed >= 1000,tier: 'legendary', icon: <Ghost size={15}/> },
-    { id: 'grandmaster',  name: 'Grandmaster',     desc: 'Try every game in the arcade',       unlocked: gamesTried >= 30,        tier: 'legendary', icon: <ShieldCheck size={15}/> },
+    { id: 'grandmaster',  name: 'Grandmaster',     desc: 'Try every game in the arcade',       unlocked: gamesTried >= GAMES.filter(g => g.available).length, tier: 'legendary', icon: <ShieldCheck size={15}/> },
     { id: 'ascended',     name: 'Ascended',        desc: 'Convert XP to NIM 10 times',         unlocked: conversions >= 10,       tier: 'legendary', icon: <BadgeCheck size={15}/> },
   ]
   const unlockedCount = achievements.filter(a => a.unlocked).length
