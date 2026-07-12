@@ -36,6 +36,18 @@ export default function ProfilePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Payouts are processed by a backend cron (process-payouts), not
+  // instantly — poll while anything is still in-flight so "pending" flips
+  // to "sent" on screen without the player having to leave and come back.
+  useEffect(() => {
+    if (!backendAvailable) return
+    const hasInFlight = payouts.some(p => p.status === 'pending' || p.status === 'processing')
+    if (!hasInFlight) return
+    const id = setInterval(refresh, 4000)
+    return () => clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payouts])
+
   if (!user) return null
   const totalXp = user.totalXp ?? user.xp
   const { level } = getXpProgress(totalXp)
