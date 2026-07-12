@@ -195,7 +195,7 @@ export interface Database {
           amount_nim: number
           reason: string
           tx_hash: string | null
-          status: 'pending' | 'sent' | 'failed'
+          status: 'pending' | 'processing' | 'sent' | 'failed'
           created_at: string
         }
         Insert: {
@@ -204,7 +204,7 @@ export interface Database {
           amount_nim: number
           reason: string
           tx_hash?: string | null
-          status?: 'pending' | 'sent' | 'failed'
+          status?: 'pending' | 'processing' | 'sent' | 'failed'
         }
         Update: Partial<Database['public']['Tables']['payouts']['Insert']>
         Relationships: []

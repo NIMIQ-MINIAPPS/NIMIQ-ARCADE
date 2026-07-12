@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../store/useGameStore'
-import { formatAddress, formatNim, getNimiqSDK } from '../lib/nimiq'
+import { formatAddress, formatNim, getNimiqSDK, fetchNimBalance } from '../lib/nimiq'
 import { xpToNim } from '../lib/xp'
 import { updateDisplayName, requestXpConversion } from '../lib/backend'
 import XpBar from '../components/ui/XpBar'
@@ -61,11 +61,23 @@ function SendModal({ onClose }: { onClose: () => void }) {
 }
 
 export default function HomePage() {
-  const { user, nimBalance, nimiqAddress, setActiveTab, highScores, setUser } = useGameStore()
+  const { user, nimBalance, nimiqAddress, setActiveTab, highScores, setUser, setNimBalance } = useGameStore()
   const [sendOpen, setSendOpen] = useState(false)
   const [converting, setConverting] = useState(false)
   const [editingName, setEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
+
+  // The Mini App SDK has no balance-reading method, so we read the real
+  // on-chain balance directly (see lib/nimiq's fetchNimBalance). Refresh on
+  // every visit to Home and poll while it's open, since a payout can land
+  // seconds to minutes after a conversion or a room/tournament payout.
+  useEffect(() => {
+    if (!nimiqAddress) return
+    const refresh = () => { fetchNimBalance(nimiqAddress).then(setNimBalance) }
+    refresh()
+    const id = setInterval(refresh, 15000)
+    return () => clearInterval(id)
+  }, [nimiqAddress, setNimBalance])
 
   if (!user) return null
 

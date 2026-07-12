@@ -13,16 +13,35 @@
 //     `window.nimiq`; it never resolves outside Nimiq Pay, so callers must not
 //     await it unconditionally — detect the host first (see `isRunningInNimiqPay`).
 //
-// KNOWN GAP: no documented method for fetching a NIM balance was found in this
-// package's types, nimiq.dev's Mini Apps page, or the Hub API references linked
-// from it. `listAccounts()` in this module intentionally returns `balance: 0`
-// for real (non-mock) accounts until that's confirmed — do not fake a number
-// here, callers should treat 0 as "unknown" rather than "empty wallet".
+// BALANCE: the Mini App SDK itself has no balance-reading method (see gap
+// note this used to have here). Resolved instead by querying a public
+// Nimiq Albatross RPC node directly — verified live in
+// supabase/functions/process-payouts (getAccountByAddress is a real method,
+// responses come wrapped as {result:{data,metadata}}). This works for any
+// address, mock or real, since it's independent of the Mini App SDK.
 
 import { init, requestDeviceIdentifier as sdkRequestDeviceIdentifier } from '@nimiq/mini-app-sdk'
 import type { NimiqProvider } from '@nimiq/mini-app-sdk'
 
 const LUNAS_PER_NIM = 1e5
+const NIMIQ_RPC_URL = 'https://rpc.nimiqwatch.com'
+
+/** Reads an address's real, current NIM balance straight from the chain. */
+export async function fetchNimBalance(address: string): Promise<number> {
+  try {
+    const res = await fetch(NIMIQ_RPC_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getAccountByAddress', params: [address] }),
+    })
+    const json = await res.json()
+    const lunas = json.result?.data?.balance
+    return typeof lunas === 'number' ? lunas / LUNAS_PER_NIM : 0
+  } catch (err) {
+    console.error('[Nimiq] fetchNimBalance failed:', err)
+    return 0
+  }
+}
 
 export interface NimiqAccount {
   address: string
@@ -89,8 +108,7 @@ class RealNimiqSDK implements NimiqSDK {
       console.error('[Nimiq] listAccounts failed:', result.error)
       return []
     }
-    // balance intentionally 0/unknown — see KNOWN GAP note above.
-    return result.map(address => ({ address, balance: 0 }))
+    return Promise.all(result.map(async address => ({ address, balance: await fetchNimBalance(address) })))
   }
 
   async requestPayment({ recipient, amount }: PaymentRequest): Promise<PaymentResult> {
