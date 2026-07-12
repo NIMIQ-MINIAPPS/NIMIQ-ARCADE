@@ -3,16 +3,34 @@ import { motion } from 'framer-motion'
 import { useGameStore } from '../store/useGameStore'
 import { formatAddress } from '../lib/nimiq'
 import { xpToNim, getXpProgress } from '../lib/xp'
+import { GAMES } from '../lib/games'
 import {
   backendAvailable, getCurrentPlayerId, fetchLeaderboard, fetchMyPayouts,
   requestXpConversion, type LeaderboardEntry, type PayoutRow,
 } from '../lib/backend'
 import XpBar from '../components/ui/XpBar'
 import NimBadge from '../components/ui/NimBadge'
-import { NimLogo, DecorHex } from '../components/ui/Hex'
-import { Gamepad2, Layers, Zap, Loader2 } from 'lucide-react'
+import { DecorHex } from '../components/ui/Hex'
+import {
+  Gamepad2, Layers, Zap, Loader2, Trophy, Flame, Compass, Star, Wallet,
+  Crown, Shield, Gem, Sparkles, Rocket, Infinity as InfinityIcon, Puzzle, Lock,
+} from 'lucide-react'
 
 const MEDAL = ['#C49210', 'var(--nim-mid)', '#8A7040']
+
+type Tier = 'bronze' | 'silver' | 'gold' | 'legendary'
+
+// Each tier gets its own gradient, border, glow and badge shape so the
+// achievement grid reads as a real progression ladder at a glance, not a
+// uniform checklist — bronze is flat and circular, legendary gets a
+// multi-hue gradient, glow, and the hex badge shape reserved for the rarest
+// tiers.
+const TIER_STYLE: Record<Tier, { bg: string; border: string; iconColor: string; glow: string; shape: 'circle' | 'square' | 'hex'; label: string }> = {
+  bronze:    { bg: 'linear-gradient(135deg,#CD7F32,#8B5A2B)',            border: '#B87333', iconColor: '#FFF3E6', glow: 'transparent',            shape: 'circle', label: 'BRONZE' },
+  silver:    { bg: 'linear-gradient(135deg,#DCE1E8,#98A2B3)',            border: '#98A2B3', iconColor: '#1F2348', glow: 'transparent',            shape: 'square', label: 'SILVER' },
+  gold:      { bg: 'linear-gradient(135deg,#F7DC6F,#C49210)',            border: '#E9B213', iconColor: '#1F2348', glow: 'rgba(233,178,19,.5)',    shape: 'hex',    label: 'GOLD' },
+  legendary: { bg: 'linear-gradient(135deg,#A855F7,#6366F1 55%,#00E5FF)', border: '#A855F7', iconColor: '#FFFFFF', glow: 'rgba(168,85,247,.55)',   shape: 'hex',    label: 'LEGENDARY' },
+}
 
 export default function ProfilePage() {
   const { user, nimiqAddress } = useGameStore()
@@ -51,15 +69,35 @@ export default function ProfilePage() {
   if (!user) return null
   const totalXp = user.totalXp ?? user.xp
   const { level } = getXpProgress(totalXp)
-  const gamesTried = Object.keys(useGameStore.getState().highScores).length
+  const playedIds = Object.keys(useGameStore.getState().highScores)
+  const gamesTried = playedIds.length
+  const categoriesPlayed = new Set(playedIds.map(id => GAMES.find(g => g.id === id)?.category).filter(Boolean)).size
 
-  const hasConverted = payouts.some(p => p.reason === 'xp_conversion')
-  const achievements = [
-    { id: 'first_game', name: 'First Game', desc: 'Play your first game', unlocked: user.gamesPlayed > 0 },
-    { id: 'marathon', name: 'Marathon', desc: 'Play 25 games', unlocked: user.gamesPlayed >= 25 },
-    { id: 'xp_1000', name: 'XP Grinder', desc: 'Earn 1,000 XP', unlocked: totalXp >= 1000 },
-    { id: 'nim_earn', name: 'Earner', desc: 'Convert XP to NIM', unlocked: hasConverted },
+  const conversions = payouts.filter(p => p.reason === 'xp_conversion').length
+  const nimEarned = payouts.filter(p => p.status === 'sent').reduce((sum, p) => sum + p.amount_nim, 0)
+
+  const achievements: { id: string; name: string; desc: string; unlocked: boolean; tier: Tier; icon: React.ReactNode }[] = [
+    // ── Bronze — first taps ──────────────────────────────────────────────
+    { id: 'first_game',   name: 'First Steps',    desc: 'Play your first game',            unlocked: user.gamesPlayed > 0,   tier: 'bronze', icon: <Gamepad2 size={15}/> },
+    { id: 'first_convert',name: 'Cash In',         desc: 'Convert XP to NIM',                unlocked: conversions >= 1,       tier: 'bronze', icon: <Wallet size={15}/> },
+    { id: 'explorer',     name: 'Explorer',        desc: 'Try 3 different games',            unlocked: gamesTried >= 3,        tier: 'bronze', icon: <Compass size={15}/> },
+    // ── Silver — building a habit ────────────────────────────────────────
+    { id: 'marathon',     name: 'Marathon',        desc: 'Play 25 games',                    unlocked: user.gamesPlayed >= 25, tier: 'silver', icon: <Flame size={15}/> },
+    { id: 'xp_10k',       name: 'XP Hoarder',      desc: 'Earn 10,000 lifetime XP',           unlocked: totalXp >= 10000,       tier: 'silver', icon: <Zap size={15}/> },
+    { id: 'variety',      name: 'Jack of All Trades', desc: 'Try a game from all 4 categories', unlocked: categoriesPlayed >= 4, tier: 'silver', icon: <Layers size={15}/> },
+    { id: 'level_10',     name: 'Rising Star',     desc: 'Reach level 10',                    unlocked: level >= 10,            tier: 'silver', icon: <Star size={15}/> },
+    // ── Gold — real dedication ──────────────────────────────────────────
+    { id: 'veteran',      name: 'Arcade Veteran',  desc: 'Play 100 games',                    unlocked: user.gamesPlayed >= 100,tier: 'gold',   icon: <Trophy size={15}/> },
+    { id: 'xp_100k',      name: 'XP Titan',        desc: 'Earn 100,000 lifetime XP',          unlocked: totalXp >= 100000,      tier: 'gold',   icon: <Crown size={15}/> },
+    { id: 'completionist',name: 'Completionist',   desc: 'Try 15 different games',            unlocked: gamesTried >= 15,       tier: 'gold',   icon: <Puzzle size={15}/> },
+    { id: 'level_25',     name: 'Elite',           desc: 'Reach level 25',                    unlocked: level >= 25,            tier: 'gold',   icon: <Shield size={15}/> },
+    { id: 'whale',        name: 'Whale',           desc: 'Earn 1+ NIM from payouts',          unlocked: nimEarned >= 1,         tier: 'gold',   icon: <Gem size={15}/> },
+    // ── Legendary — the ceiling ──────────────────────────────────────────
+    { id: 'legend',       name: 'Living Legend',   desc: 'Play 500 games',                    unlocked: user.gamesPlayed >= 500,tier: 'legendary', icon: <Sparkles size={15}/> },
+    { id: 'xp_1m',        name: 'XP Ascendant',    desc: 'Earn 1,000,000 lifetime XP',        unlocked: totalXp >= 1000000,     tier: 'legendary', icon: <Rocket size={15}/> },
+    { id: 'max_level',    name: 'Max Level',       desc: 'Reach level 35',                    unlocked: level >= 35,            tier: 'legendary', icon: <InfinityIcon size={15}/> },
   ]
+  const unlockedCount = achievements.filter(a => a.unlocked).length
 
   // Global leaderboard, with the local user's own row merged in by id (or appended if not synced yet).
   // Ranking always uses totalXp (lifetime) — converting XP to NIM never costs a player their rank.
@@ -159,24 +197,34 @@ export default function ProfilePage() {
 
         {/* Achievements */}
         <div>
-          <p className="text-[10px] tracking-widest font-bold mb-2" style={{color:'var(--nim-muted)'}}>ACHIEVEMENTS</p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[10px] tracking-widest font-bold" style={{color:'var(--nim-muted)'}}>ACHIEVEMENTS</p>
+            <p className="text-[10px] font-bold" style={{color:'var(--nim-muted)'}}>{unlockedCount}/{achievements.length}</p>
+          </div>
           <div className="grid grid-cols-2 gap-2">
-            {achievements.map(a=>(
-              <div key={a.id} className="rounded-xl p-3 flex items-center gap-2.5"
-                style={{
-                  background:'var(--y4)', opacity:a.unlocked?1:.45,
-                  border:`1px solid ${a.unlocked?'var(--y1)':'var(--y2)'}`,
-                }}>
-                <div className="hex-clip w-8 h-8 flex items-center justify-center shrink-0"
-                  style={{background:a.unlocked?'var(--gold)':'var(--y2)'}}>
-                  <NimLogo size={16}/>
+            {achievements.map(a=>{
+              const t = TIER_STYLE[a.tier]
+              const badgeShape = t.shape === 'hex' ? 'hex-clip' : t.shape === 'circle' ? 'rounded-full' : 'rounded-lg'
+              return (
+                <div key={a.id} className="relative rounded-xl p-3 flex items-center gap-2.5 overflow-hidden"
+                  style={{
+                    background: a.unlocked ? 'var(--y4)' : 'var(--y4)',
+                    opacity: a.unlocked ? 1 : 0.5,
+                    border: `1.5px solid ${a.unlocked ? t.border : 'var(--y2)'}`,
+                    boxShadow: a.unlocked && t.glow !== 'transparent' ? `0 0 14px ${t.glow}` : 'none',
+                  }}>
+                  <div className={`${badgeShape} w-9 h-9 flex items-center justify-center shrink-0`}
+                    style={{ background: a.unlocked ? t.bg : 'var(--y2)' }}>
+                    {a.unlocked ? <span style={{ color: t.iconColor }}>{a.icon}</span> : <Lock size={13} style={{ color: 'var(--nim-muted)' }}/>}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-black tracking-wider mb-0.5" style={{ color: a.unlocked ? t.border : 'var(--nim-muted)' }}>{t.label}</p>
+                    <p className="text-xs font-black leading-tight truncate" style={{color:'var(--nim-dark)'}}>{a.name}</p>
+                    <p className="text-[10px] leading-tight" style={{color:'var(--nim-muted)'}}>{a.desc}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs font-black leading-tight" style={{color:'var(--nim-dark)'}}>{a.name}</p>
-                  <p className="text-[10px]" style={{color:'var(--nim-muted)'}}>{a.desc}</p>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
 

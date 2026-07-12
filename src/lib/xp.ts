@@ -1,12 +1,12 @@
 const DAILY_XP_LIMIT = 50000
-// 1000 XP = 0.01 NIM. Lowered from 0.02 after the first live conversion felt
-// too generous relative to how little play it took to earn — even a player
-// hitting the 50,000/day XP cap every single day now converts at most ~0.5
-// NIM/day, doubling how long the payout wallet's balance lasts vs the prior
-// rate. Must match the hardcoded rate in supabase/006_lower_xp_rate.sql's
-// request_xp_conversion (computed server-side on purpose — never trust a
-// client-supplied NIM amount for something that spends real money).
-const XP_TO_NIM_RATE = 0.01 / 1000
+// 1000 XP = 0.02 NIM. Restored to the original, more generous rate — the
+// wallet is protected from farming/exploits by a hard server-side cap of 1
+// NIM converted per player per rolling 24h (see request_xp_conversion in
+// supabase/007_anti_farming_cap.sql), independent of this rate or how much
+// XP a player has. Must match the hardcoded rate in that function
+// (computed server-side on purpose — never trust a client-supplied NIM
+// amount for something that spends real money).
+const XP_TO_NIM_RATE = 0.02 / 1000
 
 export function xpToNim(xp: number): number {
   return xp * XP_TO_NIM_RATE
