@@ -14,6 +14,8 @@ import { DecorHex } from '../components/ui/Hex'
 import {
   Gamepad2, Layers, Zap, Loader2, Trophy, Flame, Compass, Star, Wallet,
   Crown, Shield, Gem, Sparkles, Rocket, Infinity as InfinityIcon, Puzzle, Lock,
+  Sunrise, Target, Heart, Timer, Coins, Brain, Eye, TrendingUp, Award,
+  Medal, Swords, PartyPopper, Ghost, ShieldCheck, BadgeCheck, ChevronDown,
 } from 'lucide-react'
 
 const MEDAL = ['#C49210', 'var(--nim-mid)', '#8A7040']
@@ -39,6 +41,7 @@ export default function ProfilePage() {
   const [myId, setMyId] = useState<string | null>(null)
   const [converting, setConverting] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  const [achievementsShown, setAchievementsShown] = useState(4)
 
   const refresh = async () => {
     const [lb, po, id] = await Promise.all([fetchLeaderboard(50), fetchMyPayouts(), getCurrentPlayerId()])
@@ -76,26 +79,42 @@ export default function ProfilePage() {
   const conversions = payouts.filter(p => p.reason === 'xp_conversion').length
   const nimEarned = payouts.filter(p => p.status === 'sent').reduce((sum, p) => sum + p.amount_nim, 0)
 
+  const wonPrize = payouts.some(p => p.reason !== 'xp_conversion')
   const achievements: { id: string; name: string; desc: string; unlocked: boolean; tier: Tier; icon: React.ReactNode }[] = [
     // ── Bronze — first taps ──────────────────────────────────────────────
-    { id: 'first_game',   name: 'First Steps',    desc: 'Play your first game',            unlocked: user.gamesPlayed > 0,   tier: 'bronze', icon: <Gamepad2 size={15}/> },
-    { id: 'first_convert',name: 'Cash In',         desc: 'Convert XP to NIM',                unlocked: conversions >= 1,       tier: 'bronze', icon: <Wallet size={15}/> },
-    { id: 'explorer',     name: 'Explorer',        desc: 'Try 3 different games',            unlocked: gamesTried >= 3,        tier: 'bronze', icon: <Compass size={15}/> },
+    { id: 'first_game',   name: 'First Steps',    desc: 'Play your first game',              unlocked: user.gamesPlayed > 0,    tier: 'bronze', icon: <Gamepad2 size={15}/> },
+    { id: 'first_convert',name: 'Cash In',         desc: 'Convert XP to NIM',                  unlocked: conversions >= 1,        tier: 'bronze', icon: <Wallet size={15}/> },
+    { id: 'explorer',     name: 'Explorer',        desc: 'Try 3 different games',              unlocked: gamesTried >= 3,         tier: 'bronze', icon: <Compass size={15}/> },
+    { id: 'warm_up',      name: 'Warming Up',      desc: 'Play 5 games',                       unlocked: user.gamesPlayed >= 5,   tier: 'bronze', icon: <Sunrise size={15}/> },
+    { id: 'first_100xp',  name: 'Getting Started', desc: 'Earn 100 lifetime XP',               unlocked: totalXp >= 100,          tier: 'bronze', icon: <Target size={15}/> },
+    { id: 'dedicated',    name: 'Dedicated',       desc: 'Play 10 games',                      unlocked: user.gamesPlayed >= 10,  tier: 'bronze', icon: <Heart size={15}/> },
+    { id: 'quick_learner',name: 'Quick Learner',   desc: 'Reach level 3',                      unlocked: level >= 3,              tier: 'bronze', icon: <Timer size={15}/> },
+    { id: 'small_change', name: 'Small Change',    desc: 'Earn any NIM from payouts',          unlocked: nimEarned > 0,           tier: 'bronze', icon: <Coins size={15}/> },
     // ── Silver — building a habit ────────────────────────────────────────
-    { id: 'marathon',     name: 'Marathon',        desc: 'Play 25 games',                    unlocked: user.gamesPlayed >= 25, tier: 'silver', icon: <Flame size={15}/> },
-    { id: 'xp_10k',       name: 'XP Hoarder',      desc: 'Earn 10,000 lifetime XP',           unlocked: totalXp >= 10000,       tier: 'silver', icon: <Zap size={15}/> },
-    { id: 'variety',      name: 'Jack of All Trades', desc: 'Try a game from all 4 categories', unlocked: categoriesPlayed >= 4, tier: 'silver', icon: <Layers size={15}/> },
-    { id: 'level_10',     name: 'Rising Star',     desc: 'Reach level 10',                    unlocked: level >= 10,            tier: 'silver', icon: <Star size={15}/> },
-    // ── Gold — real dedication ──────────────────────────────────────────
-    { id: 'veteran',      name: 'Arcade Veteran',  desc: 'Play 100 games',                    unlocked: user.gamesPlayed >= 100,tier: 'gold',   icon: <Trophy size={15}/> },
-    { id: 'xp_100k',      name: 'XP Titan',        desc: 'Earn 100,000 lifetime XP',          unlocked: totalXp >= 100000,      tier: 'gold',   icon: <Crown size={15}/> },
-    { id: 'completionist',name: 'Completionist',   desc: 'Try 15 different games',            unlocked: gamesTried >= 15,       tier: 'gold',   icon: <Puzzle size={15}/> },
-    { id: 'level_25',     name: 'Elite',           desc: 'Reach level 25',                    unlocked: level >= 25,            tier: 'gold',   icon: <Shield size={15}/> },
-    { id: 'whale',        name: 'Whale',           desc: 'Earn 1+ NIM from payouts',          unlocked: nimEarned >= 1,         tier: 'gold',   icon: <Gem size={15}/> },
-    // ── Legendary — the ceiling ──────────────────────────────────────────
-    { id: 'legend',       name: 'Living Legend',   desc: 'Play 500 games',                    unlocked: user.gamesPlayed >= 500,tier: 'legendary', icon: <Sparkles size={15}/> },
-    { id: 'xp_1m',        name: 'XP Ascendant',    desc: 'Earn 1,000,000 lifetime XP',        unlocked: totalXp >= 1000000,     tier: 'legendary', icon: <Rocket size={15}/> },
-    { id: 'max_level',    name: 'Max Level',       desc: 'Reach level 35',                    unlocked: level >= 35,            tier: 'legendary', icon: <InfinityIcon size={15}/> },
+    { id: 'marathon',     name: 'Marathon',        desc: 'Play 25 games',                      unlocked: user.gamesPlayed >= 25,  tier: 'silver', icon: <Flame size={15}/> },
+    { id: 'xp_10k',       name: 'XP Hoarder',      desc: 'Earn 10,000 lifetime XP',            unlocked: totalXp >= 10000,        tier: 'silver', icon: <Zap size={15}/> },
+    { id: 'variety',      name: 'Jack of All Trades', desc: 'Try a game from all 4 categories', unlocked: categoriesPlayed >= 4,   tier: 'silver', icon: <Layers size={15}/> },
+    { id: 'level_10',     name: 'Rising Star',     desc: 'Reach level 10',                     unlocked: level >= 10,             tier: 'silver', icon: <Star size={15}/> },
+    { id: 'brainiac',     name: 'Brainiac',        desc: 'Try 8 different games',              unlocked: gamesTried >= 8,         tier: 'silver', icon: <Brain size={15}/> },
+    { id: 'sharp_eye',    name: 'Sharp Eye',       desc: 'Play 50 games',                      unlocked: user.gamesPlayed >= 50,  tier: 'silver', icon: <Eye size={15}/> },
+    { id: 'saver',        name: 'Saver',           desc: 'Convert XP to NIM 3 times',          unlocked: conversions >= 3,        tier: 'silver', icon: <TrendingUp size={15}/> },
+    { id: 'level_15',     name: 'Halfway There',   desc: 'Reach level 15',                     unlocked: level >= 15,             tier: 'silver', icon: <Award size={15}/> },
+    // ── Gold — real dedication ────────────────────────────────────────────
+    { id: 'veteran',      name: 'Arcade Veteran',  desc: 'Play 100 games',                     unlocked: user.gamesPlayed >= 100, tier: 'gold',   icon: <Trophy size={15}/> },
+    { id: 'xp_100k',      name: 'XP Titan',        desc: 'Earn 100,000 lifetime XP',           unlocked: totalXp >= 100000,       tier: 'gold',   icon: <Crown size={15}/> },
+    { id: 'completionist',name: 'Completionist',   desc: 'Try 15 different games',             unlocked: gamesTried >= 15,        tier: 'gold',   icon: <Puzzle size={15}/> },
+    { id: 'level_25',     name: 'Elite',           desc: 'Reach level 25',                     unlocked: level >= 25,             tier: 'gold',   icon: <Shield size={15}/> },
+    { id: 'whale',        name: 'Whale',           desc: 'Earn 1+ NIM from payouts',           unlocked: nimEarned >= 1,          tier: 'gold',   icon: <Gem size={15}/> },
+    { id: 'champion',     name: 'Champion',        desc: 'Win a prize from a room or tournament', unlocked: wonPrize,             tier: 'gold',   icon: <Medal size={15}/> },
+    { id: 'unstoppable',  name: 'Unstoppable',     desc: 'Play 250 games',                     unlocked: user.gamesPlayed >= 250, tier: 'gold',   icon: <Swords size={15}/> },
+    // ── Legendary — the ceiling ────────────────────────────────────────────
+    { id: 'legend',       name: 'Living Legend',   desc: 'Play 500 games',                     unlocked: user.gamesPlayed >= 500, tier: 'legendary', icon: <Sparkles size={15}/> },
+    { id: 'xp_1m',        name: 'XP Ascendant',    desc: 'Earn 1,000,000 lifetime XP',         unlocked: totalXp >= 1000000,      tier: 'legendary', icon: <Rocket size={15}/> },
+    { id: 'max_level',    name: 'Max Level',       desc: 'Reach level 35',                     unlocked: level >= 35,             tier: 'legendary', icon: <InfinityIcon size={15}/> },
+    { id: 'big_whale',    name: 'Mega Whale',      desc: 'Earn 5+ NIM from payouts',           unlocked: nimEarned >= 5,          tier: 'legendary', icon: <PartyPopper size={15}/> },
+    { id: 'immortal',     name: 'Immortal',        desc: 'Play 1,000 games',                   unlocked: user.gamesPlayed >= 1000,tier: 'legendary', icon: <Ghost size={15}/> },
+    { id: 'grandmaster',  name: 'Grandmaster',     desc: 'Try every game in the arcade',       unlocked: gamesTried >= 30,        tier: 'legendary', icon: <ShieldCheck size={15}/> },
+    { id: 'ascended',     name: 'Ascended',        desc: 'Convert XP to NIM 10 times',         unlocked: conversions >= 10,       tier: 'legendary', icon: <BadgeCheck size={15}/> },
   ]
   const unlockedCount = achievements.filter(a => a.unlocked).length
 
@@ -202,11 +221,12 @@ export default function ProfilePage() {
             <p className="text-[10px] font-bold" style={{color:'var(--nim-muted)'}}>{unlockedCount}/{achievements.length}</p>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            {achievements.map(a=>{
+            {achievements.slice(0, achievementsShown).map(a=>{
               const t = TIER_STYLE[a.tier]
               const badgeShape = t.shape === 'hex' ? 'hex-clip' : t.shape === 'circle' ? 'rounded-full' : 'rounded-lg'
               return (
-                <div key={a.id} className="relative rounded-xl p-3 flex items-center gap-2.5 overflow-hidden"
+                <motion.div key={a.id} initial={{opacity:0,y:6}} animate={{opacity:1,y:0}}
+                  className="relative rounded-xl p-3 flex items-center gap-2.5 overflow-hidden"
                   style={{
                     background: a.unlocked ? 'var(--y4)' : 'var(--y4)',
                     opacity: a.unlocked ? 1 : 0.5,
@@ -222,10 +242,19 @@ export default function ProfilePage() {
                     <p className="text-xs font-black leading-tight truncate" style={{color:'var(--nim-dark)'}}>{a.name}</p>
                     <p className="text-[10px] leading-tight" style={{color:'var(--nim-muted)'}}>{a.desc}</p>
                   </div>
-                </div>
+                </motion.div>
               )
             })}
           </div>
+          {achievementsShown < achievements.length && (
+            <button
+              onClick={() => setAchievementsShown(n => Math.min(achievements.length, n + 8))}
+              className="w-full mt-2 rounded-xl py-2.5 flex items-center justify-center gap-1.5 text-[11px] font-bold"
+              style={{ background: 'var(--y4)', border: '1px solid var(--y2)', color: 'var(--nim-mid)' }}
+            >
+              SEE MORE ({achievements.length - achievementsShown}) <ChevronDown size={14}/>
+            </button>
+          )}
         </div>
 
         {/* Leaderboard */}

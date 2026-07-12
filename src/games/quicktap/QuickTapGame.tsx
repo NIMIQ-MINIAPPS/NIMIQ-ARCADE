@@ -22,6 +22,13 @@ interface Target {
 
 interface Flash { id: number; text: string; x: number; y: number; color: string }
 
+// Stage 8 used to be the ceiling — hits >= 140 stayed at fixed "max chaos"
+// forever, meaning a bot (or a very good human) that survived past it could
+// farm score at a constant, learnable difficulty indefinitely. Stage now
+// keeps climbing forever (one more stage every 40 additional hits), and
+// every difficulty knob below keeps tightening past stage 8 too, decaying
+// toward a hard floor instead of flatlining — there's no point at which
+// this game stops getting harder.
 function getStage(hits: number) {
   if (hits < 5)   return 1
   if (hits < 15)  return 2
@@ -30,7 +37,7 @@ function getStage(hits: number) {
   if (hits < 75)  return 5   // smaller + faster
   if (hits < 100) return 6   // decoys appear
   if (hits < 140) return 7   // targets rotate
-  return 8                    // max chaos
+  return 8 + Math.floor((hits - 140) / 40) // max chaos, then keeps escalating
 }
 
 function maxSimult(stage: number) {
@@ -39,7 +46,7 @@ function maxSimult(stage: number) {
   if (stage <= 3) return 3
   if (stage <= 6) return 3
   if (stage <= 7) return 4
-  return 5
+  return Math.min(10, 5 + Math.floor((stage - 8) / 3)) // +1 simultaneous target every 3 stages, capped at 10 (screen limit)
 }
 
 function targetSize(stage: number, base = 72): number {
@@ -47,7 +54,7 @@ function targetSize(stage: number, base = 72): number {
   if (stage <= 4) return base - 6
   if (stage <= 6) return base - 12
   if (stage <= 7) return base - 16
-  return base - 20
+  return Math.max(22, Math.round((base - 20) * Math.pow(0.97, stage - 8))) // shrinks toward a 22px floor
 }
 
 function lifetime(stage: number): number {
@@ -55,7 +62,7 @@ function lifetime(stage: number): number {
   if (stage <= 4) return 1800
   if (stage <= 6) return 1400
   if (stage <= 7) return 1100
-  return 900
+  return Math.max(280, Math.round(900 * Math.pow(0.96, stage - 8))) // shrinks toward a 280ms floor
 }
 
 function spawnInterval(stage: number): number {
@@ -64,7 +71,7 @@ function spawnInterval(stage: number): number {
   if (stage <= 3) return 900
   if (stage <= 5) return 700
   if (stage <= 7) return 550
-  return 420
+  return Math.max(180, Math.round(420 * Math.pow(0.96, stage - 8))) // shrinks toward a 180ms floor
 }
 
 function scoreLabel(ms: number): [string, number, string] {
