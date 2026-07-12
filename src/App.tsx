@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { Volume2, VolumeX } from 'lucide-react'
 import { useGameStore } from './store/useGameStore'
 import BottomNav from './components/layout/BottomNav'
 import HomePage from './pages/HomePage'
@@ -17,7 +18,7 @@ const pageVariants = {
 }
 
 export default function App() {
-  const { activeTab, setNimiqAddress, setNimBalance, setDeviceIdentifier } = useGameStore()
+  const { activeTab, setNimiqAddress, setNimBalance, setDeviceIdentifier, soundEnabled, toggleSound } = useGameStore()
   const [demoMode, setDemoMode] = useState(false)
 
   useEffect(() => {
@@ -52,6 +53,22 @@ export default function App() {
 
   return (
     <div className="flex flex-col min-h-dvh relative" style={{ background: 'var(--bg)' }}>
+      <button
+        onClick={toggleSound}
+        aria-label={soundEnabled ? 'Mute sound' : 'Unmute sound'}
+        className="absolute z-40 flex items-center justify-center rounded-full"
+        style={{
+          top: 'calc(env(safe-area-inset-top, 0px) + 10px)',
+          right: 10,
+          width: 34, height: 34,
+          background: 'var(--y4)',
+          border: '1.5px solid var(--y1)',
+          boxShadow: '0 2px 10px rgba(31,35,72,.1)',
+          color: soundEnabled ? 'var(--gold-dark)' : 'var(--nim-muted)',
+        }}
+      >
+        {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+      </button>
       {demoMode && (
         <div
           className="shrink-0 text-center text-[10px] font-bold tracking-widest py-1"

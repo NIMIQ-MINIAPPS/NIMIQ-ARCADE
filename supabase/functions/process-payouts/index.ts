@@ -8,20 +8,34 @@
 // never be reachable from the browser bundle. This function is the only
 // thing that ever touches that key.
 //
-// STATUS: written, NOT deployed, NOT tested against a real network — there
-// is no funded wallet yet (see AGENTS.md). The Supabase read/write side is
-// straightforward and should work as-is. The Nimiq signing/broadcasting side
-// uses real, verified APIs from the installed @nimiq/core package (see the
-// comment above `signAndBroadcast` for exactly what was checked and what
-// wasn't), but has never run against a live node — treat the RPC method name
-// and network ID as needing a final check against current Nimiq RPC docs
-// before the first real run, not as guaranteed-correct.
+// STATUS: written, NOT deployed. The payout wallet (NQ47 6R63 LYET 5Q83 CDHA
+// 59G6 2EU3 CRQ6 YTGB, a dedicated classic-Nimiq-Wallet account, currently
+// holding the user's full balance — see AGENTS.md) exists but its 24-word
+// recovery phrase has not been set as a secret yet. The Supabase read/write
+// side is straightforward and should work as-is. The Nimiq signing/
+// broadcasting side is now VERIFIED against a live node (rpc.nimiqwatch.com):
+// `getBlockNumber` and `sendRawTransaction` are real, working RPC methods,
+// results come back wrapped as `{result: {data, metadata}}` (handled below),
+// and MainAlbatross's network ID is confirmed as 24 straight from Nimiq's
+// Rust source. See the comment above `signAndBroadcast` for exactly what was
+// checked. Still genuinely untested: signing+broadcasting an actual
+// transaction end-to-end (never done — do the GET dry-run, then a tiny real
+// payout, before trusting this with anything large).
 //
-// DEPLOY (once a payout wallet exists):
+// DEPLOY (once the recovery phrase is in hand — see AGENTS.md for how to get
+// it from the classic Nimiq Wallet):
 //   supabase secrets set NIMIQ_PAYOUT_MNEMONIC="word1 word2 ... word24"
-//   supabase secrets set NIMIQ_RPC_URL=<your Nimiq JSON-RPC node URL>
-//   supabase secrets set NIMIQ_NETWORK_ID=<network id — verify against Nimiq docs>
+//   supabase secrets set NIMIQ_RPC_URL=https://rpc.nimiqwatch.com
+//   supabase secrets set NIMIQ_NETWORK_ID=24
+//   (optional) supabase secrets set NIMIQ_MAX_SINGLE_PAYOUT_NIM=25
+//   (optional) supabase secrets set NIMIQ_MAX_TOTAL_PER_RUN_NIM=100
 //   supabase functions deploy process-payouts
+// SAFETY CEILINGS: this wallet is funded with the user's full balance, not
+// just an operational float, so the function hard-refuses to sign any single
+// payout above NIMIQ_MAX_SINGLE_PAYOUT_NIM (default 25 NIM) and caps total
+// NIM sent per invocation at NIMIQ_MAX_TOTAL_PER_RUN_NIM (default 100 NIM) —
+// see the constants below for why those defaults are safely above any
+// legitimate room/tournament payout.
 // VERIFY FIRST (does not send anything, safe to run immediately after deploy):
 //   curl https://<project>.functions.supabase.co/process-payouts \
 //     -H "Authorization: Bearer <anon or service key>"
@@ -85,6 +99,20 @@ function resolvePayoutKeyPair(): KeyPair {
 const LUNAS_PER_NIM = 1e5
 const MAX_PER_RUN = 20 // keep each invocation short and bounded
 
+// Hard ceilings on what this function will ever sign, independent of what
+// the database says a row is worth. This wallet holds the user's entire
+// balance (not just an operational float), so a bug in the finalize/
+// conversion SQL, a bad pot calculation, or a tampered row must not be able
+// to drain it — the function refuses and marks the row 'failed' for manual
+// review instead of sending. Rooms split a pot 70/20/10 among at most 10
+// players paying at most 2 NIM entry fee, and XP conversion is rate-limited
+// by how much XP a player can realistically earn (see supabase/003_rooms_series.sql
+// and supabase/005_lifetime_xp.sql), so legitimate payouts are well under
+// these numbers. Override via env if real usage ever legitimately needs
+// more — do not raise casually.
+const MAX_SINGLE_PAYOUT_NIM = Number(Deno.env.get('NIMIQ_MAX_SINGLE_PAYOUT_NIM') ?? '25')
+const MAX_TOTAL_PER_RUN_NIM = Number(Deno.env.get('NIMIQ_MAX_TOTAL_PER_RUN_NIM') ?? '100')
+
 interface PendingPayout {
   id: string
   player_id: string
@@ -99,14 +127,16 @@ interface PendingPayout {
  * all exist with exactly this shape), then broadcasts it via a plain
  * JSON-RPC POST to `rpcUrl`.
  *
- * UNVERIFIED: the JSON-RPC method name (`sendRawTransaction` is the
- * conventional name across most chains' RPC specs and is used here as the
- * best-available guess, not a confirmed Nimiq method — cross-check against
- * https://nimiq.dev or the node's own `rpc_methods` listing before relying
- * on this) and the numeric `networkId` for Nimiq's Albatross mainnet/testnet
- * (left as a required env var instead of a hardcoded guess for that reason).
- * `validityStartHeight` also needs the current block height — fetched below
- * via a `getBlockNumber` RPC call, same caveat on the exact method name.
+ * VERIFIED live against https://rpc.nimiqwatch.com (a public Albatross
+ * mainnet RPC node):
+ * - `getBlockNumber` and `sendRawTransaction` are real methods on that node.
+ * - Every successful result is wrapped as `{"result": {"data": <value>,
+ *   "metadata": ...}}`, NOT a bare value — `rpcCall` below unwraps `.data`.
+ *   (`getBlockNumber` returned `{"data": 55951400, "metadata": null}` etc.)
+ * - Errors come back as standard JSON-RPC `{"error": {"code","message","data"}}`.
+ * - `NetworkId.MainAlbatross = 24`, confirmed directly against Nimiq's Rust
+ *   source (nimiq/core-rs-albatross, primitives/src/networks.rs) — this is
+ *   the value for `NIMIQ_NETWORK_ID` on mainnet.
  */
 async function signAndBroadcast(recipientAddress: string, amountNim: number): Promise<string> {
   if (!RPC_URL) throw new Error('NIMIQ_RPC_URL not configured')
@@ -120,7 +150,7 @@ async function signAndBroadcast(recipientAddress: string, amountNim: number): Pr
     })
     const json = await res.json()
     if (json.error) throw new Error(`RPC ${method} failed: ${JSON.stringify(json.error)}`)
-    return json.result
+    return json.result?.data as T
   }
 
   const keyPair = resolvePayoutKeyPair()
@@ -168,9 +198,28 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ processed: 0 }), { headers: { 'Content-Type': 'application/json' } })
   }
 
-  const results: { id: string; status: 'sent' | 'failed'; detail: string }[] = []
+  const results: { id: string; status: 'sent' | 'failed' | 'skipped'; detail: string }[] = []
+  let runTotalNim = 0
 
   for (const payout of pending as PendingPayout[]) {
+    // Safety ceiling: refuse anything abnormally large rather than sign it.
+    // A payout that hits this is almost certainly a bug upstream (bad pot
+    // math, a tampered row) and needs a human to look at it, not an
+    // automated signer.
+    if (payout.amount_nim > MAX_SINGLE_PAYOUT_NIM) {
+      await supabase.from('payouts').update({ status: 'failed' }).eq('id', payout.id)
+      results.push({ id: payout.id, status: 'failed', detail: `amount_nim ${payout.amount_nim} exceeds MAX_SINGLE_PAYOUT_NIM (${MAX_SINGLE_PAYOUT_NIM}) — needs manual review` })
+      continue
+    }
+    // Safety ceiling: cap total NIM sent per invocation. Remaining pending
+    // rows are simply left 'pending' for the next run rather than failed —
+    // this just throttles how fast the wallet can be drained, it doesn't
+    // reject anything.
+    if (runTotalNim + payout.amount_nim > MAX_TOTAL_PER_RUN_NIM) {
+      results.push({ id: payout.id, status: 'skipped', detail: `would exceed MAX_TOTAL_PER_RUN_NIM (${MAX_TOTAL_PER_RUN_NIM}) for this run — left pending for next run` })
+      continue
+    }
+
     // Optimistic lock: only proceed if this row is still 'pending' at the
     // moment we claim it — guards against two overlapping invocations
     // double-sending the same payout.
@@ -198,6 +247,7 @@ Deno.serve(async (req) => {
     try {
       const txHash = await signAndBroadcast(player.nimiq_address, payout.amount_nim)
       await supabase.from('payouts').update({ status: 'sent', tx_hash: txHash }).eq('id', payout.id)
+      runTotalNim += payout.amount_nim
       results.push({ id: payout.id, status: 'sent', detail: txHash })
     } catch (err) {
       await supabase.from('payouts').update({ status: 'failed' }).eq('id', payout.id)

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { User, Tab } from '../types'
 import { getLevelFromXp, calculateDailyXpReward } from '../lib/xp'
+import { setSoundMuted } from '../lib/gameAudio'
 
 export interface ActiveRoom {
   roomId: string
@@ -47,6 +48,12 @@ interface GameStore {
    * "a room/tournament round just ended with score N" even when N is lower
    * than the player's all-time best for that game. */
   lastScoreEvent: { gameId: string; score: number; nonce: number } | null
+
+  /** Persisted user preference — every game's snd() reads lib/gameAudio's
+   * module-level `soundMuted` flag, which toggleSound keeps in sync with
+   * this on every change and on store hydration. */
+  soundEnabled: boolean
+  toggleSound: () => void
 }
 
 const defaultUser: User = {
@@ -76,6 +83,7 @@ export const useGameStore = create<GameStore>()(
       activeTournament: null,
       highScores: {},
       lastScoreEvent: null,
+      soundEnabled: true,
 
       setUser: (user) => set({ user }),
       setActiveTab: (tab) => set({ activeTab: tab }),
@@ -119,7 +127,22 @@ export const useGameStore = create<GameStore>()(
           lastScoreEvent: { gameId, score, nonce: (lastScoreEvent?.nonce ?? 0) + 1 },
         })
       },
+
+      toggleSound: () => {
+        const next = !get().soundEnabled
+        setSoundMuted(!next)
+        set({ soundEnabled: next })
+      },
     }),
-    { name: 'nim-arcade-store' }
+    {
+      name: 'nim-arcade-store',
+      onRehydrateStorage: () => (state) => {
+        // gameAudio's `soundMuted` is a plain module variable, not part of
+        // this store, so it needs to be re-synced from the persisted
+        // preference on every load — otherwise sound defaults back to
+        // unmuted after a refresh even if the user had muted it.
+        if (state) setSoundMuted(!state.soundEnabled)
+      },
+    }
   )
 )
