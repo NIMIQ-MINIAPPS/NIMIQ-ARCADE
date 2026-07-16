@@ -9,7 +9,6 @@ import OnlinePage from './pages/OnlinePage'
 import TournamentsPage from './pages/TournamentsPage'
 import ProfilePage from './pages/ProfilePage'
 import NicknameGateModal from './components/ui/NicknameGateModal'
-import AdminMetricsPage from './pages/AdminMetricsPage'
 import { initNimiq, isUsingMockSdk } from './lib/nimiq'
 import { startBackendSync } from './lib/backendSync'
 
@@ -22,15 +21,6 @@ const pageVariants = {
 export default function App() {
   const { activeTab, user, setUser, setNimiqAddress, setNimBalance, setDeviceIdentifier, soundEnabled, toggleSound } = useGameStore()
   const [demoMode, setDemoMode] = useState(false)
-  // Hidden entry point for the internal metrics dashboard — never a bottom-nav
-  // tab (regular players shouldn't see it). Just open the app with #admin.
-  const [isAdminRoute, setIsAdminRoute] = useState(() => window.location.hash === '#admin')
-
-  useEffect(() => {
-    const onHashChange = () => setIsAdminRoute(window.location.hash === '#admin')
-    window.addEventListener('hashchange', onHashChange)
-    return () => window.removeEventListener('hashchange', onHashChange)
-  }, [])
 
   // One-time migration: players who already had a custom display name before
   // the nickname gate existed shouldn't be re-prompted for one.
@@ -68,10 +58,6 @@ export default function App() {
       case 'tournaments': return <TournamentsPage key="tournaments" />
       case 'profile': return <ProfilePage key="profile" />
     }
-  }
-
-  if (isAdminRoute) {
-    return <AdminMetricsPage />
   }
 
   if (user && !user.hasNickname) {
