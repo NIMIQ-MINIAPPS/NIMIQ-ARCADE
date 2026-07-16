@@ -6,7 +6,9 @@ import { hasSeenTutorial, markTutorialSeen, TUTORIALS } from '../../lib/tutorial
 
 const BG = '#FFF8E8'
 const W = 380, H = 400
-const GRAVITY = 0.78, JUMP = -14, GROUND = H - 48
+// Matches Chrome's offline T-Rex runner (Trex.config: GRAVITY 0.6) — a
+// quick, controlled hop rather than a heavy yank back to the ground.
+const GRAVITY = 0.6, JUMP = -13, GROUND = H - 48
 const PX = 60, PR = 16
 const SPEED_INIT = 6.5, SPEED_MAX = 22
 const PC = '#4CC9F0'   // player cyan
