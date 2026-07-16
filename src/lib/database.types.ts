@@ -245,6 +245,40 @@ export interface Database {
         Args: { p_room_id: string; p_round_number: number; p_score: number }
         Returns: Database['public']['Tables']['rooms']['Row']
       }
+      is_admin: {
+        Args: Record<string, never>
+        Returns: boolean
+      }
+      admin_overview_metrics: {
+        Args: Record<string, never>
+        Returns: {
+          total_players: number
+          players_with_wallet: number
+          new_players_today: number
+          new_players_7d: number
+          new_players_30d: number
+          active_today: number
+          active_7d: number
+          active_30d: number
+          total_games_played: number
+          total_high_scores: number
+          nim_paid_out: number
+          nim_payouts_pending: number
+          nim_entry_fees_est: number
+        }[]
+      }
+      admin_top_games: {
+        Args: { p_limit?: number }
+        Returns: { game_id: string; unique_players: number; avg_score: number; top_score: number }[]
+      }
+      admin_growth: {
+        Args: { p_days?: number }
+        Returns: { day: string; new_players: number }[]
+      }
+      admin_volume_growth: {
+        Args: { p_days?: number }
+        Returns: { day: string; nim_paid_out: number }[]
+      }
     }
   }
 }

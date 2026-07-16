@@ -61,6 +61,12 @@
     min-height: 100dvh;
     background: var(--bg);
   }
+
+  /* Admin metrics dashboard is meant to be screen-shared/presented on
+     desktop — break out of the mobile-arcade width constraint for it. */
+  #root:has(.admin-metrics-page) {
+    max-width: 100%;
+  }
 }
 
 /* ── Utilities ──────────────────────────────────────────────────────────── */
