@@ -6,9 +6,8 @@ import { hasSeenTutorial, markTutorialSeen, TUTORIALS } from '../../lib/tutorial
 
 const BG = '#FFF8E8'
 const W = 380, H = 400
-// Matches Chrome's offline T-Rex runner (Trex.config: GRAVITY 0.6) — a
-// quick, controlled hop rather than a heavy yank back to the ground.
-const GRAVITY = 0.6, JUMP = -13, GROUND = H - 48
+// A single fixed hop, no gravity simulation — same height/speed every time.
+const JUMP_FRAMES = 32, JUMP_HEIGHT = 140, GROUND = H - 48
 const PX = 60, PR = 16
 const SPEED_INIT = 6.5, SPEED_MAX = 22
 const PC = '#4CC9F0'   // player cyan
@@ -86,7 +85,7 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
   const [distDisp,  setDistDisp]  = useState(0)
   const [scoreDisp, setScoreDisp] = useState(0)
 
-  const pY    = useRef(GROUND-PR), pVY = useRef(0), pJ = useRef(0)
+  const pY    = useRef(GROUND-PR), jumping = useRef(false), jumpT = useRef(0)
   const spd   = useRef(SPEED_INIT), dist = useRef(0), sc = useRef(0)
   const obs   = useRef<OData[]>([]), coins = useRef<Coin[]>([])
   const lastCoin = useRef(0), coinFlash = useRef(0)
@@ -94,12 +93,12 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
   const alive = useRef(false), raf = useRef(0)
 
   const jump = useCallback(() => {
-    if (!alive.current || pJ.current >= 2) return
-    pVY.current = JUMP; pJ.current++; snd('jump')
+    if (!alive.current || jumping.current) return
+    jumping.current = true; jumpT.current = 0; snd('jump')
   }, [])
 
   const startGame = useCallback(() => {
-    pY.current=GROUND-PR; pVY.current=0; pJ.current=0
+    pY.current=GROUND-PR; jumping.current=false; jumpT.current=0
     spd.current=SPEED_INIT; dist.current=0; sc.current=0
     obs.current=[]; coins.current=[]; lastCoin.current=0; coinFlash.current=0
     rollAngle.current=0
@@ -124,9 +123,14 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
 
       if (frame%3===0) setDistDisp(Math.floor(dist.current))
 
-      // Physics
-      pVY.current += GRAVITY; pY.current += pVY.current
-      if (pY.current >= GROUND-PR) { pY.current=GROUND-PR; pVY.current=0; pJ.current=0 }
+      // Jump — one fixed hop, no gravity accumulation
+      if (jumping.current) {
+        jumpT.current += 1 / JUMP_FRAMES
+        if (jumpT.current >= 1) { jumpT.current = 1; jumping.current = false }
+        pY.current = (GROUND-PR) - JUMP_HEIGHT * Math.sin(jumpT.current * Math.PI)
+      } else {
+        pY.current = GROUND-PR
+      }
 
       // Spawn obstacles
       const rightmost = obs.current.reduce((mx,o)=>Math.max(mx,o.x+o.w), 0)
@@ -196,7 +200,7 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
       }
 
       // Roll when on ground
-      if (pJ.current === 0) rollAngle.current += sp * 0.05 / PR
+      if (!jumping.current) rollAngle.current += sp * 0.05 / PR
 
       // Player trail (ghost hexes)
       drawHex(ctx,PX-8,pY.current+2,PR*0.65,PC,0.14)
