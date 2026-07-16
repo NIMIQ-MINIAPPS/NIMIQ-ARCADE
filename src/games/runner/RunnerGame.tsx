@@ -9,7 +9,10 @@ const W = 380, H = 400
 // A single fixed hop, no gravity simulation — same height/speed every time.
 const JUMP_FRAMES = 32, JUMP_HEIGHT = 140, GROUND = H - 48
 const PX = 60, PR = 16
-const SPEED_INIT = 6.5, SPEED_MAX = 22
+// No real ceiling — speed keeps climbing for the entire run, it just ramps
+// up fast early on and much more gradually after DIST_BREAK, so a long run
+// keeps getting harder forever instead of flatlining at a farmable speed.
+const SPEED_INIT = 6.5, SPEED_RATE_EARLY = 0.007, SPEED_RATE_LATE = 0.0015, DIST_BREAK = 1400
 const PC = '#4CC9F0'   // player cyan
 const GC = '#FFD166'   // ground yellow
 
@@ -118,7 +121,9 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
       if (!alive.current) return
       frame++
       const sp = spd.current
-      spd.current = Math.min(SPEED_MAX, SPEED_INIT + dist.current * 0.007)
+      spd.current = dist.current < DIST_BREAK
+        ? SPEED_INIT + dist.current * SPEED_RATE_EARLY
+        : SPEED_INIT + DIST_BREAK * SPEED_RATE_EARLY + (dist.current - DIST_BREAK) * SPEED_RATE_LATE
       dist.current += sp * 0.05
 
       if (frame%3===0) setDistDisp(Math.floor(dist.current))
@@ -136,11 +141,12 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
       // converted using the current speed. That's what actually matters for
       // fairness: the jump is a fixed 32-frame hop, so early on the gap
       // between groups stays comfortably longer than that (a real landing
-      // window every time); it only tightens toward — and eventually past —
-      // the jump's own duration as distance/speed ramp up, which is where
-      // it's fine for things to genuinely get hard.
+      // window every time). It decays toward a 24-frame floor exponentially
+      // rather than hard-clamping there, so — paired with speed that never
+      // stops climbing above — a long run keeps genuinely getting harder
+      // instead of settling into a farmable, memorizable rhythm.
       const rightmost = obs.current.reduce((mx,o)=>Math.max(mx,o.x+o.w), 0)
-      const framesNeeded = Math.max(24, 46 - dist.current * 0.010)
+      const framesNeeded = 24 + 22 * Math.exp(-dist.current / 2200)
       const gap = Math.max(80, sp * framesNeeded)
       if (rightmost < W - gap) obs.current.push(...genGroup(dist.current))
       obs.current.forEach(o=>{ o.x-=sp })
