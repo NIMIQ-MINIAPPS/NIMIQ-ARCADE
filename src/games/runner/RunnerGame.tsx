@@ -132,9 +132,16 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
         pY.current = GROUND-PR
       }
 
-      // Spawn obstacles
+      // Spawn obstacles — gap is defined in TIME (frames), not pixels, and
+      // converted using the current speed. That's what actually matters for
+      // fairness: the jump is a fixed 32-frame hop, so early on the gap
+      // between groups stays comfortably longer than that (a real landing
+      // window every time); it only tightens toward — and eventually past —
+      // the jump's own duration as distance/speed ramp up, which is where
+      // it's fine for things to genuinely get hard.
       const rightmost = obs.current.reduce((mx,o)=>Math.max(mx,o.x+o.w), 0)
-      const gap = dist.current < 700 ? 210 : dist.current < 1400 ? 175 : Math.max(120, 165 - dist.current * 0.005)
+      const framesNeeded = Math.max(24, 46 - dist.current * 0.010)
+      const gap = Math.max(80, sp * framesNeeded)
       if (rightmost < W - gap) obs.current.push(...genGroup(dist.current))
       obs.current.forEach(o=>{ o.x-=sp })
       obs.current = obs.current.filter(o=>o.x+o.w>-10)
