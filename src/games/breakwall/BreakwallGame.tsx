@@ -3,6 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/useGameStore'
 import { soundMuted } from '../../lib/gameAudio'
 import { vibrate } from '../../lib/haptics'
+import LivesHearts from '../../components/games/LivesHearts'
+import HowToPlayOverlay from '../../components/games/HowToPlayOverlay'
+import { hasSeenTutorial, markTutorialSeen, TUTORIALS } from '../../lib/tutorials'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const BG = '#FFF9E8'
@@ -17,6 +20,16 @@ const BALL_R = 6
 const ROW_COLORS = ['#93DCFF', '#C4B5FD', '#86EFAC', '#FDBA74', '#FCA5A5', '#FCD34D', '#F9A8D4', '#A5D8FF']
 const POWER_COLORS: Record<PowerType, string> = { multi: '#C4B5FD', wide: '#86EFAC', fast: '#FDBA74', laser: '#FF6B6B' }
 const POWER_LABEL: Record<PowerType, string> = { multi: 'M', wide: 'W', fast: 'F', laser: 'L' }
+const INITIAL_LIVES = 3
+
+// Ball base speed creeps up the longer a life/level runs, so the game never
+// stays at the same pace forever. The `fast` power-up buff still multiplies
+// on top of whatever the current time-based base speed happens to be.
+const BASE_SPEED = 5
+const FAST_SPEED_MULT = 1.5 // matches the original constant fast-buff speed of 7.5
+const SPEED_RAMP_STEP = 0.3
+const SPEED_RAMP_INTERVAL_FRAMES = 360 // ~6s at 60fps
+const MAX_BASE_SPEED_MULT = 1.6 // base speed never exceeds 1.6x its starting value
 
 type PowerType = 'multi' | 'wide' | 'fast' | 'laser'
 
@@ -81,7 +94,7 @@ function brickY(b: Brick): number { return TOP + b.row * (BRICK_H + GAP) }
 
 function newBall(px: number, fast = false): Ball {
   const angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.6
-  const speed = fast ? 7.5 : 5
+  const speed = fast ? BASE_SPEED * FAST_SPEED_MULT : BASE_SPEED
   return { x: px, y: PADDLE_Y - BALL_R - 2, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, fast }
 }
 
@@ -89,10 +102,10 @@ export default function BreakwallGame({ onExit }: { onExit: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const { addXp, setHighScore, highScores } = useGameStore()
 
-  const [phase, setPhase] = useState<'start' | 'play' | 'over'>('start')
+  const [phase, setPhase] = useState<'start' | 'howto' | 'play' | 'over'>('start')
   const [score, setScore] = useState(0)
   const [level, setLevel] = useState(1)
-  const [lives, setLives] = useState(3)
+  const [lives, setLives] = useState(INITIAL_LIVES)
   const [levelMsg, setLevelMsg] = useState<string | null>(null)
   const [powerBadges, setPowerBadges] = useState<PowerType[]>([])
 
@@ -105,8 +118,10 @@ export default function BreakwallGame({ onExit }: { onExit: () => void }) {
   const fallingPowers = useRef<FallingPower[]>([])
   const parts = useRef<Particle[]>([])
   const activePowers = useRef<{ wide: number; fast: number; laser: number }>({ wide: 0, fast: 0, laser: 0 })
-  const scoreRef = useRef(0), levelRef = useRef(1), livesRef = useRef(3)
+  const scoreRef = useRef(0), levelRef = useRef(1), livesRef = useRef(INITIAL_LIVES)
   const wantLaser = useRef(false)
+  const rampStartFrame = useRef(0)
+  const settled = useRef(false)
 
   const burst = useCallback((x: number, y: number, color: string, n = 10) => {
     for (let i = 0; i < n; i++) {
@@ -128,12 +143,15 @@ export default function BreakwallGame({ onExit }: { onExit: () => void }) {
   const startLevel = useCallback((lvl: number, resetPaddle: boolean) => {
     bricks.current = genLevel(lvl)
     if (resetPaddle) { paddleW.current = 90; paddleX.current = W / 2 - paddleW.current / 2 }
+    rampStartFrame.current = frame.current
     balls.current = [newBall(paddleX.current + paddleW.current / 2)]
     bolts.current = []; fallingPowers.current = []
     launched.current = false
   }, [])
 
   const doEnd = useCallback(() => {
+    if (settled.current) return
+    settled.current = true
     alive.current = false
     snd('over'); vibrate([30, 40, 60])
     addXp(Math.floor(scoreRef.current * 0.35))
@@ -141,10 +159,24 @@ export default function BreakwallGame({ onExit }: { onExit: () => void }) {
     setPhase('over')
   }, [addXp, setHighScore])
 
+  // Exiting mid-game keeps whatever XP/high score the player has earned so
+  // far, using the same formula as the natural game-over path. Guarded by
+  // `settled` so it can never double-fire alongside `doEnd`.
+  const exitPlay = useCallback(() => {
+    alive.current = false
+    if (!settled.current) {
+      settled.current = true
+      addXp(Math.floor(scoreRef.current * 0.35))
+      setHighScore('breakwall', scoreRef.current)
+    }
+    onExit()
+  }, [addXp, setHighScore, onExit])
+
   const loseLife = useCallback(() => {
     livesRef.current--; setLives(livesRef.current)
     snd('lose'); vibrate(50)
     if (livesRef.current <= 0) { doEnd(); return }
+    rampStartFrame.current = frame.current
     balls.current = [newBall(paddleX.current + paddleW.current / 2)]
     launched.current = false
   }, [doEnd])
@@ -182,6 +214,20 @@ export default function BreakwallGame({ onExit }: { onExit: () => void }) {
       } else wantLaser.current = false
 
       bolts.current = bolts.current.map(b => ({ ...b, y: b.y - 9 })).filter(b => b.y > -10)
+
+      // Time-based base speed ramp: the longer the current life/level runs,
+      // the faster the ball's base speed creeps up (capped), independent of
+      // and stacking with the temporary `fast` power-up multiplier.
+      const rampSteps = Math.floor((frame.current - rampStartFrame.current) / SPEED_RAMP_INTERVAL_FRAMES)
+      const baseSpeed = Math.min(BASE_SPEED * MAX_BASE_SPEED_MULT, BASE_SPEED + rampSteps * SPEED_RAMP_STEP)
+      balls.current.forEach(b => {
+        const targetSpeed = b.fast ? baseSpeed * FAST_SPEED_MULT : baseSpeed
+        const cur = Math.hypot(b.vx, b.vy)
+        if (cur > 0.0001) {
+          const scale = targetSpeed / cur
+          b.vx *= scale; b.vy *= scale
+        }
+      })
 
       // Move balls (or glue to paddle before launch)
       if (!launched.current) {
@@ -407,9 +453,10 @@ export default function BreakwallGame({ onExit }: { onExit: () => void }) {
   }, [phase])
 
   const startGame = useCallback(() => {
-    scoreRef.current = 0; levelRef.current = 1; livesRef.current = 3
+    scoreRef.current = 0; levelRef.current = 1; livesRef.current = INITIAL_LIVES
     activePowers.current = { wide: 0, fast: 0, laser: 0 }
-    setScore(0); setLevel(1); setLives(3); setLevelMsg(null); setPowerBadges([])
+    settled.current = false
+    setScore(0); setLevel(1); setLives(INITIAL_LIVES); setLevelMsg(null); setPowerBadges([])
     startLevel(1, true)
     setPhase('play')
   }, [startLevel])
@@ -436,11 +483,25 @@ export default function BreakwallGame({ onExit }: { onExit: () => void }) {
         <h1 style={{ fontSize: 28, fontWeight: 900, color: '#1A1A2E', margin: '0 0 8px', letterSpacing: '0.05em' }}>BREAKWALL</h1>
         <p style={{ color: '#BBB', fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', margin: 0 }}>SLIDE · TAP TO LAUNCH</p>
       </div>
-      <motion.button whileTap={{ scale: 0.96 }} onClick={startGame}
+      <motion.button whileTap={{ scale: 0.96 }} onClick={() => { if (hasSeenTutorial('breakwall')) startGame(); else setPhase('howto') }}
         style={{ background: '#1A1A2E', color: BG, border: 'none', borderRadius: 16, padding: '16px 64px', fontSize: 18, fontWeight: 900, cursor: 'pointer', letterSpacing: '0.12em' }}>
         PLAY
       </motion.button>
       {best > 0 && <p style={{ color: '#BBB', fontSize: 13, margin: 0 }}>BEST: {best.toLocaleString()}</p>}
+    </div>
+  )
+
+  // ── How to play overlay ────────────────────────────────────────────────
+  if (phase === 'howto') return (
+    <div style={{ width: '100%', height: '100%', position: 'relative', background: BG, fontFamily: 'system-ui,sans-serif' }}>
+      <HowToPlayOverlay
+        bg={BG}
+        accent="#FFB347"
+        textColor="#1A1A2E"
+        mutedColor="#BBB"
+        bullets={TUTORIALS['breakwall']}
+        onStart={() => { markTutorialSeen('breakwall'); startGame() }}
+      />
     </div>
   )
 
@@ -474,7 +535,7 @@ export default function BreakwallGame({ onExit }: { onExit: () => void }) {
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: '#0D0A18', fontFamily: 'system-ui,sans-serif' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 20px 4px', flexShrink: 0 }}>
-        <button onClick={() => { alive.current = false; onExit() }}
+        <button onClick={exitPlay}
           style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)', fontSize: 20, cursor: 'pointer', padding: 0 }}>←</button>
         <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
           <div style={{ textAlign: 'center' }}>
@@ -486,11 +547,7 @@ export default function BreakwallGame({ onExit }: { onExit: () => void }) {
             <p style={{ fontSize: 20, fontWeight: 900, color: 'white', margin: 0, lineHeight: 1.1 }}>{score.toLocaleString()}</p>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 5 }}>
-          {[0, 1, 2].map(i => (
-            <div key={i} style={{ width: 11, height: 11, borderRadius: '50%', background: i < lives ? '#FFB347' : 'rgba(255,255,255,0.1)', boxShadow: i < lives ? '0 0 6px #FFB347' : 'none' }} />
-          ))}
-        </div>
+        <LivesHearts lives={lives} maxLives={INITIAL_LIVES} color="#FF6B6B" />
       </div>
 
       {powerBadges.length > 0 && (

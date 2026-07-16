@@ -1,12 +1,17 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/useGameStore'
+import LivesHearts from '../../components/games/LivesHearts'
+import HowToPlayOverlay from '../../components/games/HowToPlayOverlay'
+import { hasSeenTutorial, markTutorialSeen, TUTORIALS } from '../../lib/tutorials'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const BG  = '#FFF9E8'
 const W   = 390
 const H   = 580
 const PC  = '#4CC9F0'   // player color
+const INITIAL_LIVES = 3
+const GAME_ID = 'galaxy-defender'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type EnemyType = 'scout' | 'tank' | 'zigzag' | 'boss'
@@ -122,12 +127,19 @@ function makeEnemy(type: EnemyType, wave: number): Enemy {
 
 function waveEnemies(wave: number): Enemy[] {
   const out: Enemy[] = []
-  const add = (t: EnemyType, n: number) => { for (let i=0;i<n;i++) out.push(makeEnemy(t, wave)) }
-  if (wave <= 3)  { add('scout', 3+wave*2) }
-  else if (wave <= 6)  { add('scout', 5+wave); add('tank', wave-2) }
-  else if (wave <= 15) { add('scout', 6); add('tank', 3); add('zigzag', wave-4) }
-  else if (wave <= 25) { add('scout', 6); add('tank', 4); add('zigzag', 8); if(wave>=20) add('boss', 1) }
-  else { add('scout', 6); add('tank', 5); add('zigzag', 10); add('boss', Math.floor(wave/12)) }
+  const add = (t: EnemyType, n: number) => { for (let i=0;i<Math.round(n);i++) out.push(makeEnemy(t, wave)) }
+  // Gradual, capped ramps instead of hardcoded tier jumps — difficulty climbs
+  // continuously and plateaus rather than spiking at wave 3/6/15/25.
+  const scoutCount  = Math.min(4 + wave, 12)
+  const tankCount   = wave >= 4  ? Math.min((wave - 3) * 0.6, 8)  : 0
+  const zigzagCount = wave >= 7  ? Math.min((wave - 6) * 0.7, 12) : 0
+  const bossCount   = wave >= 18 ? Math.min(Math.floor((wave - 18) / 8) + 1, 4) : 0
+
+  add('scout', scoutCount)
+  if (tankCount > 0)   add('tank', tankCount)
+  if (zigzagCount > 0) add('zigzag', zigzagCount)
+  if (bossCount > 0)   add('boss', bossCount)
+
   return out
 }
 
@@ -136,10 +148,10 @@ export default function GalaxyDefenderGame({ onExit }: { onExit: () => void }) {
   const { addXp, setHighScore, highScores } = useGameStore()
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
-  const [phase,   setPhase]   = useState<'start'|'play'|'over'>('start')
+  const [phase,   setPhase]   = useState<'start'|'howto'|'play'|'over'>('start')
   const [score,   setScore]   = useState(0)
   const [wave,    setWave]    = useState(1)
-  const [lives,   setLives]   = useState(3)
+  const [lives,   setLives]   = useState(INITIAL_LIVES)
   const [waveMsg, setWaveMsg] = useState<string|null>(null)
 
   const alive    = useRef(false), raf = useRef(0)
@@ -147,7 +159,9 @@ export default function GalaxyDefenderGame({ onExit }: { onExit: () => void }) {
   const bullets  = useRef<Bullet[]>([])
   const enemies  = useRef<Enemy[]>([])
   const parts    = useRef<Particle[]>([])
-  const scoreRef = useRef(0), waveRef = useRef(1), livesRef = useRef(3)
+  const scoreRef = useRef(0), waveRef = useRef(1), livesRef = useRef(INITIAL_LIVES)
+  const transitioning = useRef(false)
+  const ended    = useRef(false)
 
   // Stars (static, pre-computed)
   const stars = useRef(Array.from({length:60},(_,i)=>({
@@ -165,12 +179,28 @@ export default function GalaxyDefenderGame({ onExit }: { onExit: () => void }) {
   }, [])
 
   const doEnd = useCallback(() => {
+    if (ended.current) return
+    ended.current = true
     alive.current = false; snd('doom')
     cancelAnimationFrame(raf.current)
     addXp(Math.floor(scoreRef.current * 0.3))
-    setHighScore('galaxy-defender', scoreRef.current)
+    setHighScore(GAME_ID, scoreRef.current)
     setPhase('over')
   }, [addXp, setHighScore])
+
+  // Exit mid-game (back button during play): keep whatever XP/score was
+  // earned so far using the same formula as a natural game over, guarded
+  // so it never double-fires alongside doEnd.
+  const exitMidGame = useCallback(() => {
+    if (!ended.current) {
+      ended.current = true
+      addXp(Math.floor(scoreRef.current * 0.3))
+      setHighScore(GAME_ID, scoreRef.current)
+    }
+    alive.current = false
+    cancelAnimationFrame(raf.current)
+    onExit()
+  }, [addXp, setHighScore, onExit])
 
   // ── Game loop ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -191,11 +221,16 @@ export default function GalaxyDefenderGame({ onExit }: { onExit: () => void }) {
       const CW = W, CH = H
 
       // ── Auto-shoot ───────────────────────────────────────────────────────
-      shootT.current++
-      const rate = Math.max(10, 22 - Math.floor(waveRef.current * 0.4))
-      if (shootT.current % rate === 0) {
-        bullets.current.push({ id:++_id, x:shipX.current, y:CH-80, vy:-11, fromEnemy:false })
-        snd('shoot')
+      // Difficulty scaling is capped at wave 20 so late waves plateau
+      // instead of climbing forever.
+      const diffWave = Math.min(waveRef.current, 20)
+      if (!transitioning.current) {
+        shootT.current++
+        const rate = Math.max(10, 22 - Math.floor(diffWave * 0.4))
+        if (shootT.current % rate === 0) {
+          bullets.current.push({ id:++_id, x:shipX.current, y:CH-80, vy:-11, fromEnemy:false })
+          snd('shoot')
+        }
       }
       if (flashT.current > 0) flashT.current--
 
@@ -217,7 +252,7 @@ export default function GalaxyDefenderGame({ onExit }: { onExit: () => void }) {
       })
 
       // ── Enemy shoot ──────────────────────────────────────────────────────
-      const eShootChance = 0.004 + waveRef.current * 0.002
+      const eShootChance = 0.004 + diffWave * 0.002
       enemies.current.forEach(e => {
         if (Math.random() < eShootChance)
           bullets.current.push({ id:++_id, x:e.x, y:e.y+CFG[e.type].hh, vy:3.5+waveRef.current*0.15, fromEnemy:true })
@@ -259,11 +294,19 @@ export default function GalaxyDefenderGame({ onExit }: { onExit: () => void }) {
       if (enemies.current.some(e => e.y + CFG[e.type].hh > CH - 50)) { doEnd(); return }
 
       // ── Wave clear ────────────────────────────────────────────────────────
-      if (enemies.current.length === 0) {
-        snd('wave'); waveRef.current++; setWave(waveRef.current)
-        setWaveMsg(`WAVE ${waveRef.current}`)
-        setTimeout(() => setWaveMsg(null), 1600)
-        enemies.current = waveEnemies(waveRef.current)
+      // Brief "get ready" pause before the next wave's enemies actually
+      // spawn/move, instead of throwing the player straight into it.
+      if (enemies.current.length === 0 && !transitioning.current) {
+        transitioning.current = true
+        const nextWave = waveRef.current + 1
+        snd('wave')
+        setWaveMsg(`WAVE ${nextWave}`)
+        setTimeout(() => {
+          waveRef.current = nextWave; setWave(nextWave)
+          enemies.current = waveEnemies(nextWave)
+          setWaveMsg(null)
+          transitioning.current = false
+        }, 1000)
       }
 
       // ── Particles ─────────────────────────────────────────────────────────
@@ -349,14 +392,15 @@ export default function GalaxyDefenderGame({ onExit }: { onExit: () => void }) {
   const startGame = useCallback(() => {
     bullets.current = []; enemies.current = waveEnemies(1); parts.current = []
     shipX.current = W/2; shootT.current = 0; flashT.current = 0
-    scoreRef.current = 0; waveRef.current = 1; livesRef.current = 3
-    setScore(0); setWave(1); setLives(3); setWaveMsg(null)
+    scoreRef.current = 0; waveRef.current = 1; livesRef.current = INITIAL_LIVES
+    transitioning.current = false; ended.current = false
+    setScore(0); setWave(1); setLives(INITIAL_LIVES); setWaveMsg(null)
     setPhase('play')
   }, [])
 
   useEffect(() => () => { alive.current = false; cancelAnimationFrame(raf.current) }, [])
 
-  const best = highScores['galaxy-defender'] ?? 0
+  const best = highScores[GAME_ID] ?? 0
 
   // ── Start screen ──────────────────────────────────────────────────────────
   if (phase === 'start') return (
@@ -397,11 +441,24 @@ export default function GalaxyDefenderGame({ onExit }: { onExit: () => void }) {
         <p style={{ color:'#BBB',fontSize:11,fontWeight:700,letterSpacing:'0.14em',margin:0 }}>SLIDE TO MOVE · AUTO-FIRE</p>
       </div>
 
-      <motion.button whileTap={{ scale:0.96 }} onClick={startGame}
+      <motion.button whileTap={{ scale:0.96 }}
+        onClick={() => { if (hasSeenTutorial(GAME_ID)) startGame(); else setPhase('howto') }}
         style={{ background:'#1A1A2E',color:BG,border:'none',borderRadius:16,padding:'16px 64px',fontSize:18,fontWeight:900,cursor:'pointer',letterSpacing:'0.12em' }}>
         PLAY
       </motion.button>
       {best > 0 && <p style={{ color:'#BBB',fontSize:13,margin:0 }}>BEST: {best.toLocaleString()}</p>}
+    </div>
+  )
+
+  // ── How to play overlay ───────────────────────────────────────────────────
+  if (phase === 'howto') return (
+    <div style={{ width:'100%',height:'100%',position:'relative',background:'#0F0E2A' }}>
+      <HowToPlayOverlay
+        bg="#0F0E2A"
+        accent="#4FC3F7"
+        bullets={TUTORIALS[GAME_ID]}
+        onStart={() => { markTutorialSeen(GAME_ID); startGame() }}
+      />
     </div>
   )
 
@@ -439,7 +496,7 @@ export default function GalaxyDefenderGame({ onExit }: { onExit: () => void }) {
 
       {/* HUD */}
       <div style={{ display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 20px 6px',flexShrink:0 }}>
-        <button onClick={()=>{ alive.current=false; cancelAnimationFrame(raf.current); onExit() }}
+        <button onClick={exitMidGame}
           style={{ background:'none',border:'none',color:'rgba(255,255,255,0.35)',fontSize:20,cursor:'pointer',padding:0 }}>←</button>
         <div style={{ display:'flex',gap:20,alignItems:'center' }}>
           <div style={{ textAlign:'center' }}>
@@ -451,13 +508,7 @@ export default function GalaxyDefenderGame({ onExit }: { onExit: () => void }) {
             <p style={{ fontSize:20,fontWeight:900,color:'white',margin:0,lineHeight:1.1 }}>{score.toLocaleString()}</p>
           </div>
         </div>
-        <div style={{ display:'flex',gap:5 }}>
-          {[0,1,2].map(i=>(
-            <div key={i} style={{ width:11,height:11,borderRadius:'50%',
-              background: i<lives ? PC : 'rgba(255,255,255,0.1)',
-              boxShadow: i<lives ? `0 0 6px ${PC}` : 'none', transition:'all 0.25s' }}/>
-          ))}
-        </div>
+        <LivesHearts lives={lives} maxLives={INITIAL_LIVES} color="#FF6B6B" />
       </div>
 
       {/* Canvas */}

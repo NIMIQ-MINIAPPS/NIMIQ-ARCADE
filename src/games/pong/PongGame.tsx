@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/useGameStore'
 import { soundMuted } from '../../lib/gameAudio'
 import { vibrate } from '../../lib/haptics'
+import { hasSeenTutorial, markTutorialSeen, TUTORIALS } from '../../lib/tutorials'
+import HowToPlayOverlay from '../../components/games/HowToPlayOverlay'
 
 const W = 380, H = 560, PAD_W = 80, PAD_H = 10, BALL_S = 10, WIN = 7
 const PLAYER_COL = '#4CC9F0', AI_COL = '#FF9F43', CHAOS_COL = '#FDBA74', OBST_COL = '#C4B5FD'
@@ -33,12 +35,26 @@ function snd(type: 'hit' | 'aiHit' | 'score' | 'aiScore' | 'wall' | 'win' | 'los
   } catch {/**/}
 }
 
-function aiParams(totalPts: number) {
+type Difficulty = 'easy' | 'medium' | 'hard'
+
+const AI_TIERS: Record<Difficulty, {
+  speedBase: number; speedRate: number; speedCap: number
+  lagBase: number; lagRate: number; lagMin: number
+  errBase: number; errRate: number; errMin: number
+  smartDiv: number; smartCap: number
+}> = {
+  easy: { speedBase: 2.2, speedRate: 0.22, speedCap: 5.2, lagBase: 9, lagRate: 0.5, lagMin: 2, errBase: 40, errRate: 2.2, errMin: 6, smartDiv: 20, smartCap: 0.7 },
+  medium: { speedBase: 3, speedRate: 0.32, speedCap: 7.2, lagBase: 7, lagRate: 0.5, lagMin: 1, errBase: 30, errRate: 2.2, errMin: 2, smartDiv: 12, smartCap: 1 },
+  hard: { speedBase: 4, speedRate: 0.4, speedCap: 8.5, lagBase: 5, lagRate: 0.5, lagMin: 0.5, errBase: 20, errRate: 2.2, errMin: 1, smartDiv: 6, smartCap: 1 },
+}
+
+function aiParams(totalPts: number, difficulty: Difficulty) {
+  const t = AI_TIERS[difficulty]
   return {
-    speed: Math.min(3 + totalPts * 0.32, 7.2),
-    lag: Math.max(1, 7 - totalPts * 0.5),
-    error: Math.max(2, 30 - totalPts * 2.2),
-    smart: Math.min(totalPts / 12, 1),
+    speed: Math.min(t.speedBase + totalPts * t.speedRate, t.speedCap),
+    lag: Math.max(t.lagMin, t.lagBase - totalPts * t.lagRate),
+    error: Math.max(t.errMin, t.errBase - totalPts * t.errRate),
+    smart: Math.min(totalPts / t.smartDiv, t.smartCap),
   }
 }
 
@@ -46,12 +62,13 @@ export default function PongGame({ onExit }: { onExit: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const { addXp, setHighScore, highScores } = useGameStore()
 
-  const [phase, setPhase] = useState<'start' | 'play' | 'over'>('start')
+  const [phase, setPhase] = useState<'start' | 'howto' | 'play' | 'over'>('start')
   const [pScore, setPScore] = useState(0)
   const [aScore, setAScore] = useState(0)
   const [won, setWon] = useState(false)
   const [serveMsg, setServeMsg] = useState<string | null>(null)
   const [effectMsg, setEffectMsg] = useState<string | null>(null)
+  const [difficulty, setDifficulty] = useState<Difficulty>('medium')
 
   const playerX = useRef(W / 2 - PAD_W / 2)
   const aiX = useRef(W / 2 - PAD_W / 2)
@@ -99,6 +116,19 @@ export default function PongGame({ onExit }: { onExit: () => void }) {
     setPhase('over')
   }, [addXp, setHighScore])
 
+  // Exiting mid-game still banks whatever XP/score has been earned so far.
+  // Guarded by `alive` so it never double-fires against a natural finish()
+  // that already ran (or against a second click of the exit button).
+  const handleExit = useCallback(() => {
+    if (alive.current) {
+      alive.current = false
+      const sc = ps.current * 100
+      addXp(Math.floor(sc * 0.3))
+      setHighScore('pong-duel', sc)
+    }
+    onExit()
+  }, [addXp, setHighScore, onExit])
+
   // ── Game loop ────────────────────────────────────────────────────────
   useEffect(() => {
     if (phase !== 'play') { cancelAnimationFrame(raf.current); return }
@@ -113,7 +143,7 @@ export default function PongGame({ onExit }: { onExit: () => void }) {
       if (!alive.current) return
       frame.current++
       const totalPts = ps.current + as_.current
-      const ai = aiParams(totalPts)
+      const ai = aiParams(totalPts, difficulty)
 
       // Unlock special effects at score thresholds
       const unlock = (n: number, label: string, fn: () => void) => {
@@ -251,7 +281,7 @@ export default function PongGame({ onExit }: { onExit: () => void }) {
     }
     raf.current = requestAnimationFrame(loop)
     return () => { alive.current = false; cancelAnimationFrame(raf.current) }
-  }, [phase, burst, finish, serve, spawnBall])
+  }, [phase, burst, finish, serve, spawnBall, difficulty])
 
   const startGame = useCallback(() => {
     ps.current = 0; as_.current = 0; setPScore(0); setAScore(0)
@@ -303,11 +333,44 @@ export default function PongGame({ onExit }: { onExit: () => void }) {
         <h1 style={{ fontSize: 28, fontWeight: 900, color: '#1A1A2E', margin: '0 0 8px', letterSpacing: '0.05em' }}>PONG DUEL</h1>
         <p style={{ color: '#BBB', fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', margin: 0 }}>SLIDE TO MOVE · FIRST TO {WIN}</p>
       </div>
-      <motion.button whileTap={{ scale: 0.96 }} onClick={startGame}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+        <p style={{ color: '#BBB', fontSize: 10, fontWeight: 800, letterSpacing: '0.18em', margin: 0 }}>DIFFICULTY</p>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {(['easy', 'medium', 'hard'] as const).map(d => (
+            <button key={d} onClick={() => setDifficulty(d)}
+              style={{
+                background: difficulty === d ? '#1A1A2E' : 'transparent',
+                color: difficulty === d ? BG : '#1A1A2E',
+                border: '1.5px solid #1A1A2E',
+                borderRadius: 10,
+                padding: '8px 16px',
+                fontSize: 12,
+                fontWeight: 900,
+                letterSpacing: '0.08em',
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+              }}>
+              {d}
+            </button>
+          ))}
+        </div>
+      </div>
+      <motion.button whileTap={{ scale: 0.96 }} onClick={() => { if (hasSeenTutorial('pong-duel')) startGame(); else setPhase('howto') }}
         style={{ background: '#1A1A2E', color: BG, border: 'none', borderRadius: 16, padding: '16px 64px', fontSize: 18, fontWeight: 900, cursor: 'pointer', letterSpacing: '0.12em' }}>
         PLAY
       </motion.button>
       {best > 0 && <p style={{ color: '#BBB', fontSize: 13, margin: 0 }}>BEST: {best.toLocaleString()}</p>}
+    </div>
+  )
+
+  if (phase === 'howto') return (
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <HowToPlayOverlay
+        bg="#171334"
+        accent="#E9B213"
+        bullets={TUTORIALS['pong-duel']}
+        onStart={() => { markTutorialSeen('pong-duel'); startGame() }}
+      />
     </div>
   )
 
@@ -333,7 +396,7 @@ export default function PongGame({ onExit }: { onExit: () => void }) {
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: '#0E0B22', fontFamily: 'system-ui,sans-serif' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 20px 6px', flexShrink: 0 }}>
-        <button onClick={() => { alive.current = false; onExit() }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)', fontSize: 20, cursor: 'pointer', padding: 0 }}>←</button>
+        <button onClick={handleExit} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)', fontSize: 20, cursor: 'pointer', padding: 0 }}>←</button>
         <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
           <div style={{ textAlign: 'center' }}>
             <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.15em', color: AI_COL, margin: 0, opacity: 0.7 }}>AI</p>
@@ -344,7 +407,7 @@ export default function PongGame({ onExit }: { onExit: () => void }) {
             <p style={{ fontSize: 20, fontWeight: 900, color: PLAYER_COL, margin: 0, lineHeight: 1.1 }}>{pScore}</p>
           </div>
         </div>
-        <div style={{ width: 20 }} />
+        <p style={{ width: 46, fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'rgba(255,255,255,0.35)', margin: 0, textAlign: 'right', textTransform: 'uppercase' }}>{difficulty}</p>
       </div>
 
       <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', position: 'relative' }}>

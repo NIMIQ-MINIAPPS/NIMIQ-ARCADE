@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/useGameStore'
 import { soundMuted } from '../../lib/gameAudio'
 import { vibrate } from '../../lib/haptics'
+import { hasSeenTutorial, markTutorialSeen, TUTORIALS } from '../../lib/tutorials'
+import HowToPlayOverlay from '../../components/games/HowToPlayOverlay'
 
 const BG = '#FFF9E8'
 const BOARD_BG = '#16130E'
@@ -88,7 +90,7 @@ const PREVIEW_TARGET = PREVIEW_PATH.size ? [...PREVIEW_PATH].reduce((s, i) => s 
 
 export default function SumPathGame({ onExit }: { onExit: () => void }) {
   const { addXp, setHighScore, highScores } = useGameStore()
-  const [phase, setPhase] = useState<'start' | 'play' | 'over'>('start')
+  const [phase, setPhase] = useState<'start' | 'howto' | 'play' | 'over'>('start')
 
   const [gridSize, setGridSize] = useState(4)
   const [gridVals, setGridVals] = useState<number[]>([])
@@ -325,11 +327,17 @@ export default function SumPathGame({ onExit }: { onExit: () => void }) {
         <h1 style={{ fontSize: 28, fontWeight: 900, color: '#1A1A2E', margin: '0 0 8px', letterSpacing: '0.05em' }}>SUM PATH</h1>
         <p style={{ color: '#BBB', fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', margin: 0 }}>DRAG A PATH THAT HITS THE TARGET</p>
       </div>
-      <motion.button whileTap={{ scale: 0.96 }} onClick={start}
+      <motion.button whileTap={{ scale: 0.96 }} onClick={() => { if (hasSeenTutorial('sum-path')) start(); else setPhase('howto') }}
         style={{ background: '#1A1A2E', color: BG, border: 'none', borderRadius: 16, padding: '16px 64px', fontSize: 18, fontWeight: 900, cursor: 'pointer', letterSpacing: '0.12em' }}>
         PLAY
       </motion.button>
       {best > 0 && <p style={{ color: '#BBB', fontSize: 13, margin: 0 }}>BEST: {best.toLocaleString()}</p>}
+    </div>
+  )
+
+  if (phase === 'howto') return (
+    <div style={{ width: '100%', height: '100%', background: BG, position: 'relative', fontFamily: 'system-ui,sans-serif' }}>
+      <HowToPlayOverlay bg={BG} accent="#1A1A2E" bullets={TUTORIALS['sum-path']} onStart={() => { markTutorialSeen('sum-path'); start() }} />
     </div>
   )
 
@@ -368,7 +376,16 @@ export default function SumPathGame({ onExit }: { onExit: () => void }) {
   return (
     <div style={{ width: '100%', height: '100%', background: BOARD_BG, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui,sans-serif', overflow: 'hidden', userSelect: 'none', WebkitUserSelect: 'none' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 18px 2px', flexShrink: 0 }}>
-        <button onClick={() => { isRunning.current = false; onExit() }} style={{ background: 'none', border: 'none', color: '#665F4E', fontSize: 20, cursor: 'pointer', padding: 0 }}>←</button>
+        <button onClick={() => {
+          if (isRunning.current) {
+            isRunning.current = false
+            if (scoreRef.current > 0) {
+              addXp(Math.floor(scoreRef.current * 0.45))
+              setHighScore('sum-path', scoreRef.current)
+            }
+          }
+          onExit()
+        }} style={{ background: 'none', border: 'none', color: '#665F4E', fontSize: 20, cursor: 'pointer', padding: 0 }}>←</button>
         <div style={{ textAlign: 'center' }}>
           <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.15em', color: '#8A8266', margin: 0 }}>TIME</p>
           <p style={{ fontSize: 17, fontWeight: 900, color: timeLeft <= 20 ? RED : BG, margin: 0, lineHeight: 1.1 }}>{formatTime(timeLeft)}</p>

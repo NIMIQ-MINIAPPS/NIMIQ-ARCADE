@@ -27,8 +27,6 @@ import DualNBackGame from '../games/dualnback/DualNBackGame'
 import FocusGridGame from '../games/focusgrid/FocusGridGame'
 import SpeedSortGame from '../games/speedsort/SpeedSortGame'
 import SpaceRaidGame from '../games/spaceraid/SpaceRaidGame'
-import PacMazeGame from '../games/pacmaze/PacMazeGame'
-import AsteroidFieldGame from '../games/asteroidfield/AsteroidFieldGame'
 import FrogCrossGame from '../games/frogcross/FrogCrossGame'
 import GravitySwitchGame from '../games/gravityswitch/GravitySwitchGame'
 import NeonBladeGame from '../games/neonblade/NeonBladeGame'
@@ -172,8 +170,6 @@ export default function GamesPage() {
       case 'focus-grid':     return <FocusGridGame onExit={exit} />
       case 'speed-sort':     return <SpeedSortGame onExit={exit} />
       case 'space-raid':     return <SpaceRaidGame onExit={exit} />
-      case 'pac-maze':       return <PacMazeGame onExit={exit} />
-      case 'asteroid-field': return <AsteroidFieldGame onExit={exit} />
       case 'frog-cross':     return <FrogCrossGame onExit={exit} />
       case 'gravity-switch': return <GravitySwitchGame onExit={exit} />
       case 'neon-blade':     return <NeonBladeGame onExit={exit} />

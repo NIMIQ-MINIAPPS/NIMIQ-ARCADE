@@ -12,16 +12,22 @@ import { ChevronRight, Zap, Gift, ArrowUpRight, Pencil, Check, X, Loader2 } from
 
 const FEATURED = ['nimtris', 'hexfall', 'runner', 'quicktap', 'memory']
 
-function SendModal({ onClose }: { onClose: () => void }) {
+function SendModal({ onClose, balance }: { onClose: () => void; balance: number }) {
   const [recipient, setRecipient] = useState('')
   const [amount, setAmount] = useState('')
   const [sending, setSending] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null)
 
+  const amt = Number(amount)
+  const validAddress = recipient.trim().length > 0
+  const overBalance = !!amount && amt > balance
+  const validAmount = !!amount && amt > 0 && !overBalance
+  const canSend = validAddress && validAmount && !sending
+
   const handleSend = async () => {
-    const amt = Number(amount)
-    if (!recipient.trim() || !amt || amt <= 0) return
+    if (!canSend) return
     setSending(true)
+    setResult(null)
     const sdk = getNimiqSDK()
     const res = await sdk?.requestPayment({ recipient: recipient.trim(), amount: amt })
     setSending(false)
@@ -35,7 +41,7 @@ function SendModal({ onClose }: { onClose: () => void }) {
       onClick={onClose}>
       <motion.div initial={{ y: 40 }} animate={{ y: 0 }} exit={{ y: 40 }}
         onClick={e => e.stopPropagation()}
-        className="w-full max-w-[430px] rounded-t-3xl p-5 space-y-3"
+        className="w-full max-w-[430px] rounded-t-3xl p-5 pb-[max(20px,env(safe-area-inset-bottom,20px))] space-y-3"
         style={{ background: 'var(--y5)' }}>
         <div className="flex items-center justify-between mb-1">
           <p className="font-black text-sm" style={{ color: 'var(--nim-dark)' }}>SEND NIM</p>
@@ -44,13 +50,25 @@ function SendModal({ onClose }: { onClose: () => void }) {
         <input placeholder="Recipient address (NQ…)" value={recipient} onChange={e => setRecipient(e.target.value)}
           className="w-full px-3 py-2.5 rounded-xl text-sm font-mono outline-none"
           style={{ background: 'var(--y4)', border: '1px solid var(--y2)', color: 'var(--nim-dark)' }} />
-        <input placeholder="Amount (NIM)" type="number" min="0" step="0.001" value={amount} onChange={e => setAmount(e.target.value)}
-          className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
-          style={{ background: 'var(--y4)', border: '1px solid var(--y2)', color: 'var(--nim-dark)' }} />
+        <div className="relative">
+          <input placeholder="Amount (NIM)" type="number" min="0" step="0.001" value={amount} onChange={e => setAmount(e.target.value)}
+            className="w-full px-3 py-2.5 pr-16 rounded-xl text-sm outline-none"
+            style={{ background: 'var(--y4)', border: `1px solid ${overBalance ? '#E74C3C' : 'var(--y2)'}`, color: 'var(--nim-dark)' }} />
+          <button
+            onClick={() => setAmount(String(balance))}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-black px-2 py-1 rounded-lg"
+            style={{ background: 'var(--gold)', color: 'var(--nim-dark)' }}
+          >
+            MAX
+          </button>
+        </div>
+        <p className="text-[11px]" style={{ color: overBalance ? '#E74C3C' : 'var(--nim-muted)' }}>
+          {overBalance ? 'Amount exceeds your balance' : `Available: ${balance.toFixed(3)} NIM`}
+        </p>
         {result && (
           <p className="text-[12px] font-semibold" style={{ color: result.ok ? 'var(--green)' : '#E74C3C' }}>{result.text}</p>
         )}
-        <button onClick={handleSend} disabled={sending || !recipient.trim() || !amount}
+        <button onClick={handleSend} disabled={!canSend}
           className="w-full py-3 font-black rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
           style={{ background: 'var(--nim-dark)', color: 'var(--gold)' }}>
           {sending ? <Loader2 size={16} className="animate-spin" /> : 'CONFIRM SEND'}
@@ -306,7 +324,7 @@ export default function HomePage() {
       </div>
 
       <AnimatePresence>
-        {sendOpen && <SendModal onClose={() => setSendOpen(false)} />}
+        {sendOpen && <SendModal onClose={() => setSendOpen(false)} balance={nimBalance} />}
       </AnimatePresence>
     </div>
   )

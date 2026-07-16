@@ -3,6 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/useGameStore'
 import { soundMuted } from '../../lib/gameAudio'
 import { vibrate } from '../../lib/haptics'
+import { hasSeenTutorial, markTutorialSeen, TUTORIALS } from '../../lib/tutorials'
+import HowToPlayOverlay from '../../components/games/HowToPlayOverlay'
+import LivesHearts from '../../components/games/LivesHearts'
 
 const BG = '#FFF9E8'
 type Rule = 'color' | 'shape' | 'size'
@@ -50,7 +53,7 @@ function ShapeIcon({ shape, size, color }: { shape: 0 | 1; size: number; color: 
 
 export default function SpeedSortGame({ onExit }: { onExit: () => void }) {
   const { addXp, setHighScore, highScores } = useGameStore()
-  const [phase, setPhase] = useState<'start' | 'play' | 'over'>('start')
+  const [phase, setPhase] = useState<'start' | 'howto' | 'play' | 'over'>('start')
   const [rule, setRule] = useState<Rule>('color')
   const [obj, setObj] = useState<Obj>(() => genObj())
   const [score, setScore] = useState(0)
@@ -114,6 +117,18 @@ export default function SpeedSortGame({ onExit }: { onExit: () => void }) {
 
   useEffect(() => () => { isRunning.current = false; clearInterval(barTimer.current) }, [])
 
+  const exitPlay = useCallback(() => {
+    if (isRunning.current) {
+      isRunning.current = false
+      clearInterval(barTimer.current)
+      if (scoreRef.current > 0) {
+        addXp(Math.floor(scoreRef.current * 0.3))
+        setHighScore('speed-sort', scoreRef.current)
+      }
+    }
+    onExit()
+  }, [addXp, setHighScore, onExit])
+
   const choose = useCallback((side: 0 | 1) => {
     if (!isRunning.current || feedback) return
     clearInterval(barTimer.current)
@@ -157,11 +172,17 @@ export default function SpeedSortGame({ onExit }: { onExit: () => void }) {
         <h1 style={{ fontSize: 28, fontWeight: 900, color: '#1A1A2E', margin: '0 0 8px', letterSpacing: '0.05em' }}>SPEED SORT</h1>
         <p style={{ color: '#BBB', fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', margin: 0 }}>CLASSIFY WITH A SINGLE TAP</p>
       </div>
-      <motion.button whileTap={{ scale: 0.96 }} onClick={start}
+      <motion.button whileTap={{ scale: 0.96 }} onClick={() => { if (hasSeenTutorial('speed-sort')) start(); else setPhase('howto') }}
         style={{ background: '#1A1A2E', color: BG, border: 'none', borderRadius: 16, padding: '16px 64px', fontSize: 18, fontWeight: 900, cursor: 'pointer', letterSpacing: '0.12em' }}>
         PLAY
       </motion.button>
       {best > 0 && <p style={{ color: '#BBB', fontSize: 13, margin: 0 }}>BEST: {best.toLocaleString()}</p>}
+    </div>
+  )
+
+  if (phase === 'howto') return (
+    <div style={{ width: '100%', height: '100%', background: BG, position: 'relative', fontFamily: 'system-ui,sans-serif' }}>
+      <HowToPlayOverlay bg={BG} accent="#1A1A2E" bullets={TUTORIALS['speed-sort']} onStart={() => { markTutorialSeen('speed-sort'); start() }} />
     </div>
   )
 
@@ -201,14 +222,12 @@ export default function SpeedSortGame({ onExit }: { onExit: () => void }) {
   return (
     <div style={{ width: '100%', height: '100%', background: BG, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui,sans-serif', overflow: 'hidden' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 20px 4px', flexShrink: 0 }}>
-        <button onClick={() => { isRunning.current = false; onExit() }} style={{ background: 'none', border: 'none', color: '#CCC', fontSize: 20, cursor: 'pointer', padding: 0 }}>←</button>
+        <button onClick={exitPlay} style={{ background: 'none', border: 'none', color: '#CCC', fontSize: 20, cursor: 'pointer', padding: 0 }}>←</button>
         <div style={{ textAlign: 'center' }}>
           <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.15em', color: '#BBB', margin: 0 }}>SCORE</p>
           <p style={{ fontSize: 18, fontWeight: 900, color: '#1A1A2E', margin: 0, lineHeight: 1.1 }}>{score.toLocaleString()}</p>
         </div>
-        <div style={{ display: 'flex', gap: 4 }}>
-          {[0, 1, 2].map(i => <div key={i} style={{ width: 9, height: 9, borderRadius: '50%', background: i < lives ? '#FF6B6B' : 'rgba(0,0,0,0.1)' }} />)}
-        </div>
+        <LivesHearts lives={lives} maxLives={3} color="#FF6B6B" />
       </div>
 
       <p style={{ textAlign: 'center', fontSize: 11, fontWeight: 900, letterSpacing: '0.12em', color: '#A78BFA', margin: '2px 0 0' }}>{RULE_LABEL[rule]}</p>

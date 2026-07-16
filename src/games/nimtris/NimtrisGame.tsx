@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { ChevronLeft, ChevronRight, ChevronDown, RotateCw } from 'lucide-react'
 import { useGameStore } from '../../store/useGameStore'
+import { hasSeenTutorial, markTutorialSeen, TUTORIALS } from '../../lib/tutorials'
+import HowToPlayOverlay from '../../components/games/HowToPlayOverlay'
 
 const BG = '#FFF8E8'
 const COLS = 8, ROWS = 16, BLOCK = 28
@@ -141,7 +143,7 @@ export default function NimtrisGame({ onExit }: { onExit: () => void }) {
   const { addXp, setHighScore, highScores } = useGameStore()
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
-  const [phase, setPhase] = useState<'start' | 'play' | 'over'>('start')
+  const [phase, setPhase] = useState<'start' | 'howto' | 'play' | 'over'>('start')
   const [score, setScore]   = useState(0)
   const [lines, setLines]   = useState(0)
   const [level, setLevel]   = useState(1)
@@ -384,6 +386,18 @@ export default function NimtrisGame({ onExit }: { onExit: () => void }) {
 
   useEffect(() => () => { aliveRef.current = false; clearInterval(intervalRef.current) }, [])
 
+  const exitPlay = useCallback(() => {
+    if (aliveRef.current) {
+      aliveRef.current = false
+      clearInterval(intervalRef.current)
+      if (scoreRef.current > 0) {
+        addXp(Math.floor(scoreRef.current * 0.5))
+        setHighScore('nimtris', scoreRef.current)
+      }
+    }
+    onExit()
+  }, [addXp, setHighScore, onExit])
+
   const best = highScores['nimtris'] ?? 0
 
   // ── START SCREEN ──────────────────────────────────────────────────────────
@@ -396,11 +410,20 @@ export default function NimtrisGame({ onExit }: { onExit: () => void }) {
           <h1 style={{ fontSize:36, fontWeight:900, color:'#1A1A2E', margin:'0 0 8px', letterSpacing:'0.06em' }}>NIMTRIS</h1>
           <p style={{ color:'#AAA', fontSize:12, fontWeight:700, letterSpacing:'0.14em', lineHeight:2.2, margin:0 }}>STACK. CLEAR. SURVIVE.</p>
         </div>
-        <motion.button whileTap={{ scale:0.96 }} onClick={startGame}
+        <motion.button whileTap={{ scale:0.96 }} onClick={() => { if (hasSeenTutorial('nimtris')) startGame(); else setPhase('howto') }}
           style={{ background:'#1A1A2E', color:BG, border:'none', borderRadius:16, padding:'16px 68px', fontSize:18, fontWeight:900, cursor:'pointer', letterSpacing:'0.12em' }}>
           PLAY
         </motion.button>
         {best > 0 && <p style={{ color:'#BBB', fontSize:13, margin:0 }}>BEST: {best.toLocaleString()}</p>}
+      </div>
+    )
+  }
+
+  // ── HOW TO PLAY ───────────────────────────────────────────────────────────
+  if (phase === 'howto') {
+    return (
+      <div style={{ width:'100%', height:'100%', background:BG, position:'relative', fontFamily:'system-ui,sans-serif' }}>
+        <HowToPlayOverlay bg={BG} accent="#1A1A2E" bullets={TUTORIALS['nimtris']} onStart={() => { markTutorialSeen('nimtris'); startGame() }} />
       </div>
     )
   }
@@ -443,7 +466,8 @@ export default function NimtrisGame({ onExit }: { onExit: () => void }) {
     <div style={{ width:'100%', height:'100%', background:BG, display:'flex', flexDirection:'column', fontFamily:'system-ui,sans-serif', overflow:'hidden' }}>
 
       {/* HUD */}
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 18px 6px', flexShrink:0 }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 14px 6px', flexShrink:0 }}>
+        <button onClick={exitPlay} style={{ background:'none', border:'none', color:'#CCC', fontSize:18, cursor:'pointer', padding:0, alignSelf:'flex-start' }}>←</button>
         <div style={{ textAlign:'center', minWidth:50 }}>
           <p style={{ fontSize:9, fontWeight:700, letterSpacing:'0.15em', color:'#BBB', margin:'0 0 3px' }}>HOLD</p>
           <MiniPiece piece={holdDisp} />

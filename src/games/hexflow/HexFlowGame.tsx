@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/useGameStore'
 import { soundMuted } from '../../lib/gameAudio'
 import { vibrate } from '../../lib/haptics'
+import { hasSeenTutorial, markTutorialSeen, TUTORIALS } from '../../lib/tutorials'
+import HowToPlayOverlay from '../../components/games/HowToPlayOverlay'
 
 const BG = '#FFF9E8'
 const BOARD_BG = '#0B1420'
@@ -343,7 +345,7 @@ const PREVIEW_LAYOUT = computeLayout(PREVIEW_TILES, PREVIEW_CELLR)
 // ── main component ──────────────────────────────────────────────────────────
 export default function HexFlowGame({ onExit }: { onExit: () => void }) {
   const { addXp, setHighScore, highScores } = useGameStore()
-  const [phase, setPhase] = useState<'start' | 'play' | 'over'>('start')
+  const [phase, setPhase] = useState<'start' | 'howto' | 'play' | 'over'>('start')
   const [level, setLevel] = useState(1)
   const [score, setScore] = useState(0)
   const [rotTotal, setRotTotal] = useState(0)
@@ -484,11 +486,17 @@ export default function HexFlowGame({ onExit }: { onExit: () => void }) {
         <h1 style={{ fontSize: 28, fontWeight: 900, color: '#1A1A2E', margin: '0 0 8px', letterSpacing: '0.05em' }}>HEX FLOW</h1>
         <p style={{ color: '#BBB', fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', margin: 0 }}>ROTATE PIPES · CONNECT EVERY OUTLET</p>
       </div>
-      <motion.button whileTap={{ scale: 0.96 }} onClick={start}
+      <motion.button whileTap={{ scale: 0.96 }} onClick={() => { if (hasSeenTutorial('hex-flow')) start(); else setPhase('howto') }}
         style={{ background: '#1A1A2E', color: BG, border: 'none', borderRadius: 16, padding: '16px 64px', fontSize: 18, fontWeight: 900, cursor: 'pointer', letterSpacing: '0.12em' }}>
         PLAY
       </motion.button>
       {best > 0 && <p style={{ color: '#BBB', fontSize: 13, margin: 0 }}>BEST: {best.toLocaleString()}</p>}
+    </div>
+  )
+
+  if (phase === 'howto') return (
+    <div style={{ width: '100%', height: '100%', background: BG, position: 'relative', fontFamily: 'system-ui,sans-serif' }}>
+      <HowToPlayOverlay bg={BG} accent="#1A1A2E" bullets={TUTORIALS['hex-flow']} onStart={() => { markTutorialSeen('hex-flow'); start() }} />
     </div>
   )
 
@@ -524,7 +532,17 @@ export default function HexFlowGame({ onExit }: { onExit: () => void }) {
   return (
     <div style={{ width: '100%', height: '100%', background: BOARD_BG, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui,sans-serif', overflow: 'hidden' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 18px 4px', flexShrink: 0 }}>
-        <button onClick={() => { isRunning.current = false; clearInterval(timerRef.current); onExit() }}
+        <button onClick={() => {
+          if (isRunning.current) {
+            isRunning.current = false
+            clearInterval(timerRef.current)
+            if (scoreRef.current > 0) {
+              addXp(Math.floor(scoreRef.current * 0.2))
+              setHighScore('hex-flow', scoreRef.current)
+            }
+          }
+          onExit()
+        }}
           style={{ background: 'none', border: 'none', color: '#5B6577', fontSize: 20, cursor: 'pointer', padding: 0 }}>←</button>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
           <div style={{ textAlign: 'center' }}>

@@ -2,6 +2,9 @@ export interface User {
   id: string
   nimiqAddress: string
   displayName: string
+  /** True once the player has confirmed a nickname through the mandatory
+   * gate — before that, displayName is just the 'Player' placeholder. */
+  hasNickname: boolean
   avatar: string
   /** Spendable balance — decreases when converted to NIM. */
   xp: number

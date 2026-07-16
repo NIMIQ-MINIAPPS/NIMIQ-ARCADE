@@ -2,6 +2,8 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowUp, ArrowDown } from 'lucide-react'
 import { useGameStore } from '../../store/useGameStore'
+import HowToPlayOverlay from '../../components/games/HowToPlayOverlay'
+import { hasSeenTutorial, markTutorialSeen, TUTORIALS } from '../../lib/tutorials'
 
 const BG = '#FFF8E8'
 const COL_HI = '#80ED99'
@@ -85,7 +87,7 @@ function snd(type: 'ok' | 'no' | 'up') {
 export default function LowdownGame({ onExit }: { onExit: () => void }) {
   const { addXp, setHighScore, highScores } = useGameStore()
 
-  const [phase,    setPhase]    = useState<'start'|'play'|'over'>('start')
+  const [phase,    setPhase]    = useState<'start'|'howto'|'play'|'over'>('start')
   const [question, setQuestion] = useState<Question>(() => genQ(1))
   const [score,    setScore]    = useState(0)
   const [streak,   setStreak]   = useState(0)
@@ -198,6 +200,18 @@ export default function LowdownGame({ onExit }: { onExit: () => void }) {
 
   const best = highScores['lowdown'] ?? 0
 
+  // ── HOW TO PLAY ──────────────────────────────────────────────────────────
+  if (phase === 'howto') return (
+    <div style={{ width:'100%',height:'100%',position:'relative' }}>
+      <HowToPlayOverlay
+        bg={BG}
+        accent="#1A1A2E"
+        bullets={TUTORIALS['lowdown']}
+        onStart={() => { markTutorialSeen('lowdown'); startGame() }}
+      />
+    </div>
+  )
+
   // ── START ─────────────────────────────────────────────────────────────────
   if (phase === 'start') return (
     <div style={{ width:'100%',height:'100%',background:BG,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:20,fontFamily:'system-ui,sans-serif',position:'relative' }}>
@@ -220,7 +234,7 @@ export default function LowdownGame({ onExit }: { onExit: () => void }) {
         <div style={{ padding:'10px 22px',background:COL_HI,borderRadius:12,fontWeight:900,fontSize:13,color:'#1A1A2E' }}>HIGHER</div>
         <div style={{ padding:'10px 22px',background:COL_LO,borderRadius:12,fontWeight:900,fontSize:13,color:'#1A1A2E' }}>LOWER</div>
       </div>
-      <motion.button whileTap={{ scale:0.96 }} onClick={startGame}
+      <motion.button whileTap={{ scale:0.96 }} onClick={() => { if (hasSeenTutorial('lowdown')) startGame(); else setPhase('howto') }}
         style={{ background:'#1A1A2E',color:BG,border:'none',borderRadius:16,padding:'16px 64px',fontSize:18,fontWeight:900,cursor:'pointer',letterSpacing:'0.12em' }}>
         PLAY
       </motion.button>
@@ -268,7 +282,17 @@ export default function LowdownGame({ onExit }: { onExit: () => void }) {
 
       {/* HUD */}
       <div style={{ display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 20px 4px',flexShrink:0 }}>
-        <button onClick={()=>{ alive.current=false; onExit() }}
+        <button onClick={()=>{
+          if (alive.current) {
+            alive.current = false
+            clearInterval(gId.current); clearInterval(bId.current)
+            if (scoreRef.current > 0) {
+              addXp(Math.floor(scoreRef.current * 0.4))
+              setHighScore('lowdown', scoreRef.current)
+            }
+          }
+          onExit()
+        }}
           style={{ background:'none',border:'none',color:'#CCC',fontSize:20,cursor:'pointer',padding:0 }}>←</button>
         <div style={{ display:'flex',gap:20,alignItems:'center' }}>
           <div style={{ textAlign:'center' }}>

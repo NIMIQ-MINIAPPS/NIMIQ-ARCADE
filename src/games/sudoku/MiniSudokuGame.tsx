@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/useGameStore'
 import { soundMuted } from '../../lib/gameAudio'
 import { vibrate } from '../../lib/haptics'
+import { hasSeenTutorial, markTutorialSeen, TUTORIALS } from '../../lib/tutorials'
+import HowToPlayOverlay from '../../components/games/HowToPlayOverlay'
 
 const BG = '#FFF9E8'
 const BASE4 = [[1, 2, 3, 4], [3, 4, 1, 2], [2, 1, 4, 3], [4, 3, 2, 1]]
@@ -67,7 +69,7 @@ let _cid = 0
 
 export default function MiniSudokuGame({ onExit }: { onExit: () => void }) {
   const { addXp, setHighScore, highScores } = useGameStore()
-  const [phase, setPhase] = useState<'start' | 'play' | 'over'>('start')
+  const [phase, setPhase] = useState<'start' | 'howto' | 'play' | 'over'>('start')
   const [level, setLevel] = useState(1)
   const [score, setScore] = useState(0)
   const [grid, setGrid] = useState<(number | null)[][]>([])
@@ -83,6 +85,7 @@ export default function MiniSudokuGame({ onExit }: { onExit: () => void }) {
   const [shakeCell, setShakeCell] = useState<string | null>(null)
 
   const scoreRef = useRef(0), levelRef = useRef(1), errorRef = useRef(0)
+  const activeRef = useRef(false)
   const timerRef = useRef<ReturnType<typeof setInterval>>(0 as unknown as ReturnType<typeof setInterval>)
 
   const setupPuzzle = useCallback(() => {
@@ -99,6 +102,7 @@ export default function MiniSudokuGame({ onExit }: { onExit: () => void }) {
       setTimeLeft(prev => {
         if (prev <= 1) {
           clearInterval(timerRef.current)
+          activeRef.current = false
           snd('over'); vibrate([30, 40, 60])
           addXp(Math.floor(scoreRef.current * 0.3))
           setHighScore('mini-sudoku', scoreRef.current)
@@ -112,9 +116,22 @@ export default function MiniSudokuGame({ onExit }: { onExit: () => void }) {
 
   const start = useCallback(() => {
     scoreRef.current = 0; levelRef.current = 1
+    activeRef.current = true
     setScore(0); setLevel(1); setWon(false); setPhase('play')
     setupPuzzle()
   }, [setupPuzzle])
+
+  const handleExit = useCallback(() => {
+    if (activeRef.current) {
+      activeRef.current = false
+      clearInterval(timerRef.current)
+      if (scoreRef.current > 0) {
+        addXp(Math.floor(scoreRef.current * 0.3))
+        setHighScore('mini-sudoku', scoreRef.current)
+      }
+    }
+    onExit()
+  }, [addXp, setHighScore, onExit])
 
   const burstConfetti = useCallback(() => {
     const items: Confetto[] = Array.from({ length: 18 }, (_, i) => ({
@@ -174,11 +191,19 @@ export default function MiniSudokuGame({ onExit }: { onExit: () => void }) {
         <h1 style={{ fontSize: 28, fontWeight: 900, color: '#1A1A2E', margin: '0 0 8px', letterSpacing: '0.05em' }}>MINI SUDOKU</h1>
         <p style={{ color: '#BBB', fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', margin: 0 }}>4×4 → 6×6 · BEAT THE CLOCK</p>
       </div>
-      <motion.button whileTap={{ scale: 0.96 }} onClick={start}
+      <motion.button whileTap={{ scale: 0.96 }} onClick={() => { if (hasSeenTutorial('mini-sudoku')) start(); else setPhase('howto') }}
         style={{ background: '#1A1A2E', color: BG, border: 'none', borderRadius: 16, padding: '16px 64px', fontSize: 18, fontWeight: 900, cursor: 'pointer', letterSpacing: '0.12em' }}>
         PLAY
       </motion.button>
       {best > 0 && <p style={{ color: '#BBB', fontSize: 13, margin: 0 }}>BEST: {best.toLocaleString()}</p>}
+    </div>
+  )
+
+  // ── How to play ───────────────────────────────────────────────────────
+  if (phase === 'howto') return (
+    <div style={{ width: '100%', height: '100%', position: 'relative', fontFamily: 'system-ui,sans-serif' }}>
+      <HowToPlayOverlay bg={BG} accent="#1A1A2E" bullets={TUTORIALS['mini-sudoku']}
+        onStart={() => { markTutorialSeen('mini-sudoku'); start() }} />
     </div>
   )
 
@@ -213,7 +238,7 @@ export default function MiniSudokuGame({ onExit }: { onExit: () => void }) {
   return (
     <div style={{ width: '100%', height: '100%', background: BG, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui,sans-serif', overflow: 'hidden' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 20px 4px', flexShrink: 0 }}>
-        <button onClick={onExit} style={{ background: 'none', border: 'none', color: '#CCC', fontSize: 20, cursor: 'pointer', padding: 0 }}>←</button>
+        <button onClick={handleExit} style={{ background: 'none', border: 'none', color: '#CCC', fontSize: 20, cursor: 'pointer', padding: 0 }}>←</button>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
           <div style={{ textAlign: 'center' }}>
             <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.15em', color: '#BBB', margin: 0 }}>TIME</p>

@@ -464,45 +464,6 @@ function Breakwall({ className }: IllProps) {
   )
 }
 
-function PacMaze({ className }: IllProps) {
-  return (
-    <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill="#0B0A14" />
-      {/* maze walls */}
-      <rect x="10" y="10" width="140" height="88" rx="3" fill="none" stroke="#332E52" strokeWidth="2" />
-      <rect x="30" y="10" width="2" height="35" fill="#332E52" /><rect x="70" y="10" width="2" height="25" fill="#332E52" />
-      <rect x="110" y="10" width="2" height="35" fill="#332E52" /><rect x="30" y="63" width="2" height="35" fill="#332E52" />
-      <rect x="70" y="73" width="2" height="25" fill="#332E52" /><rect x="110" y="63" width="2" height="35" fill="#332E52" />
-      <rect x="30" y="46" width="40" height="2" fill="#332E52" /><rect x="90" y="46" width="40" height="2" fill="#332E52" />
-      {/* dots */}
-      {[[50,30],[90,30],[130,30],[50,55],[90,55],[130,55],[50,80]].map(([x,y],i)=>(
-        <circle key={i} cx={x} cy={y} r="2.5" fill="#F5B942" opacity=".85" />
-      ))}
-      {/* ghost */}
-      <path d="M22,72 a8,8 0 1,1 16,0 v10 l-3,-3 -3,3 -3,-3 -3,3 -4,-3 Z" fill="#FF6B6B" opacity=".9" />
-      {/* pac */}
-      <path d="M115,77 L140,66 A16,16 0 1,0 140,88 Z" fill="#F5B942" />
-    </svg>
-  )
-}
-
-function AsteroidField({ className }: IllProps) {
-  return (
-    <svg viewBox="0 0 160 108" className={className}>
-      <rect width="160" height="108" fill="#0C0A18" />
-      {/* asteroids */}
-      <polygon points="30,20 45,15 55,25 50,38 35,40 22,32" fill="#16132A" stroke="#C4B5FD" strokeWidth="1.5" opacity=".9" />
-      <polygon points="110,15 122,10 132,18 130,32 115,35 105,25" fill="#16132A" stroke="#C4B5FD" strokeWidth="1.5" opacity=".9" />
-      <polygon points="60,60 72,55 80,65 75,76 62,78 53,70" fill="#16132A" stroke="#C4B5FD" strokeWidth="1" opacity=".6" />
-      {/* ship */}
-      <polygon points="80,85 72,100 88,100" fill="none" stroke="#E9B213" strokeWidth="2" />
-      <circle cx="80" cy="85" r="3" fill="#E9B213" />
-      {/* thrust */}
-      <path d="M76,100 L80,110 L84,100" fill="#FDBA74" opacity=".6" />
-    </svg>
-  )
-}
-
 function FrogCross({ className }: IllProps) {
   return (
     <svg viewBox="0 0 160 108" className={className}>
@@ -1079,8 +1040,6 @@ const ILLUSTRATIONS: Record<string, React.ComponentType<IllProps>> = {
   'snake-path':     SnakePath,
   'space-raid':     SpaceRaid,
   breakwall:        Breakwall,
-  'pac-maze':       PacMaze,
-  'asteroid-field': AsteroidField,
   'frog-cross':     FrogCross,
   'pong-duel':      PongDuel,
   runner:           HexRunner,

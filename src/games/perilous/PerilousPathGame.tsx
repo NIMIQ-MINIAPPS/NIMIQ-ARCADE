@@ -1,10 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/useGameStore'
+import { hasSeenTutorial, markTutorialSeen, TUTORIALS } from '../../lib/tutorials'
+import HowToPlayOverlay from '../../components/games/HowToPlayOverlay'
+import LivesHearts from '../../components/games/LivesHearts'
 
 const BG = '#FFF9E8'
 
-type Phase = 'start' | 'memorize' | 'navigate' | 'over'
+type Phase = 'start' | 'howto' | 'memorize' | 'navigate' | 'over'
 
 function gridSize(lvl: number)   { return lvl <= 4 ? 5 : lvl <= 7 ? 6 : 7 }
 function mineCount(lvl: number, sz: number) { return Math.min(2 + lvl, Math.floor(sz * sz * 0.35)) }
@@ -72,6 +75,7 @@ export default function PerilousPathGame({ onExit }: { onExit: () => void }) {
   const [memPct,  setMemPct]  = useState(100)
 
   const scoreRef = useRef(0), livesRef = useRef(3), levelRef = useRef(1), comboRef = useRef(1)
+  const activeRef = useRef(false)
   const timerRef = useRef<ReturnType<typeof setTimeout>>(0 as unknown as ReturnType<typeof setTimeout>)
   const barRef   = useRef<ReturnType<typeof setInterval>>(0 as unknown as ReturnType<typeof setInterval>)
 
@@ -92,9 +96,22 @@ export default function PerilousPathGame({ onExit }: { onExit: () => void }) {
 
   const startGame = useCallback(() => {
     scoreRef.current = 0; livesRef.current = 3; levelRef.current = 1; comboRef.current = 1
+    activeRef.current = true
     setScore(0); setLives(3); setLevel(1); setCombo(1)
     setupLevel(1)
   }, [setupLevel])
+
+  const handleExit = useCallback(() => {
+    if (activeRef.current) {
+      activeRef.current = false
+      clearTimeout(timerRef.current); clearInterval(barRef.current)
+      if (scoreRef.current > 0) {
+        addXp(Math.floor(scoreRef.current * 0.4))
+        setHighScore('perilous-path', scoreRef.current)
+      }
+    }
+    onExit()
+  }, [addXp, setHighScore, onExit])
 
   const handleTap = useCallback((idx: number) => {
     if (phase !== 'navigate') return
@@ -112,6 +129,7 @@ export default function PerilousPathGame({ onExit }: { onExit: () => void }) {
       comboRef.current = 1; setCombo(1)
       if (livesRef.current <= 0) {
         snd('doom')
+        activeRef.current = false
         addXp(Math.floor(scoreRef.current * 0.4))
         setHighScore('perilous-path', scoreRef.current)
         setPhase('over')
@@ -168,11 +186,21 @@ export default function PerilousPathGame({ onExit }: { onExit: () => void }) {
           <h1 style={{ fontSize:28, fontWeight:900, color:'#1A1A2E', margin:'0 0 8px', letterSpacing:'0.05em' }}>PERILOUS PATH</h1>
           <p style={{ color:'#BBB', fontSize:11, fontWeight:700, letterSpacing:'0.14em', margin:0 }}>MEMORIZE · NAVIGATE · SURVIVE</p>
         </div>
-        <motion.button whileTap={{ scale:0.96 }} onClick={startGame}
+        <motion.button whileTap={{ scale:0.96 }} onClick={() => { if (hasSeenTutorial('perilous-path')) startGame(); else setPhase('howto') }}
           style={{ background:'#1A1A2E', color:BG, border:'none', borderRadius:16, padding:'16px 64px', fontSize:18, fontWeight:900, cursor:'pointer', letterSpacing:'0.12em' }}>
           PLAY
         </motion.button>
         {best > 0 && <p style={{ color:'#BBB', fontSize:13, margin:0 }}>BEST: {best.toLocaleString()}</p>}
+      </div>
+    )
+  }
+
+  // ── HOW TO PLAY ───────────────────────────────────────────────────────────
+  if (phase === 'howto') {
+    return (
+      <div style={{ width:'100%', height:'100%', position:'relative', fontFamily:'system-ui,sans-serif' }}>
+        <HowToPlayOverlay bg={BG} accent="#1A1A2E" bullets={TUTORIALS['perilous-path']}
+          onStart={() => { markTutorialSeen('perilous-path'); startGame() }} />
       </div>
     )
   }
@@ -223,7 +251,7 @@ export default function PerilousPathGame({ onExit }: { onExit: () => void }) {
 
       {/* HUD */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 20px 4px', flexShrink:0 }}>
-        <button onClick={onExit} style={{ background:'none', border:'none', color:'#CCC', fontSize:20, cursor:'pointer', padding:0 }}>←</button>
+        <button onClick={handleExit} style={{ background:'none', border:'none', color:'#CCC', fontSize:20, cursor:'pointer', padding:0 }}>←</button>
         <div style={{ textAlign:'center' }}>
           <p style={{ fontSize:9, fontWeight:700, letterSpacing:'0.15em', color:'#BBB', margin:0 }}>SCORE</p>
           <p style={{ fontSize:20, fontWeight:900, color:'#1A1A2E', margin:0, lineHeight:1.1 }}>{score.toLocaleString()}</p>
@@ -253,11 +281,8 @@ export default function PerilousPathGame({ onExit }: { onExit: () => void }) {
       </div>
 
       {/* Lives */}
-      <div style={{ display:'flex', justifyContent:'center', gap:8, paddingBottom:8, flexShrink:0 }}>
-        {[0,1,2].map(i => (
-          <div key={i} style={{ width:10, height:10, borderRadius:'50%',
-            background: i < lives ? '#FF6B6B' : 'rgba(0,0,0,0.1)', transition:'background 0.3s' }} />
-        ))}
+      <div style={{ display:'flex', justifyContent:'center', paddingBottom:8, flexShrink:0 }}>
+        <LivesHearts lives={lives} maxLives={3} color="#FF6B6B" />
       </div>
 
       {/* Grid */}

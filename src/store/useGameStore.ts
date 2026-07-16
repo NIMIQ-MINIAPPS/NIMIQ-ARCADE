@@ -60,6 +60,7 @@ const defaultUser: User = {
   id: 'local',
   nimiqAddress: '',
   displayName: 'Player',
+  hasNickname: false,
   avatar: '🎮',
   xp: 0,
   totalXp: 0,

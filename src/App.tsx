@@ -8,6 +8,7 @@ import GamesPage from './pages/GamesPage'
 import OnlinePage from './pages/OnlinePage'
 import TournamentsPage from './pages/TournamentsPage'
 import ProfilePage from './pages/ProfilePage'
+import NicknameGateModal from './components/ui/NicknameGateModal'
 import { initNimiq, isUsingMockSdk } from './lib/nimiq'
 import { startBackendSync } from './lib/backendSync'
 
@@ -18,8 +19,16 @@ const pageVariants = {
 }
 
 export default function App() {
-  const { activeTab, setNimiqAddress, setNimBalance, setDeviceIdentifier, soundEnabled, toggleSound } = useGameStore()
+  const { activeTab, user, setUser, setNimiqAddress, setNimBalance, setDeviceIdentifier, soundEnabled, toggleSound } = useGameStore()
   const [demoMode, setDemoMode] = useState(false)
+
+  // One-time migration: players who already had a custom display name before
+  // the nickname gate existed shouldn't be re-prompted for one.
+  useEffect(() => {
+    if (user && !user.hasNickname && user.displayName && user.displayName !== 'Player') {
+      setUser({ ...user, hasNickname: true })
+    }
+  }, [user, setUser])
 
   useEffect(() => {
     initNimiq().then(async (sdk) => {
@@ -49,6 +58,10 @@ export default function App() {
       case 'tournaments': return <TournamentsPage key="tournaments" />
       case 'profile': return <ProfilePage key="profile" />
     }
+  }
+
+  if (user && !user.hasNickname) {
+    return <NicknameGateModal />
   }
 
   return (

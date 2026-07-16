@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/useGameStore'
+import LivesHearts from '../../components/games/LivesHearts'
+import HowToPlayOverlay from '../../components/games/HowToPlayOverlay'
+import { hasSeenTutorial, markTutorialSeen, TUTORIALS } from '../../lib/tutorials'
 
 const BG = '#FFF9E8'
 const PASTELS = ['#93DCFF','#C4B5FD','#86EFAC','#FDBA74','#F9A8D4','#67E8F9','#FCD34D']
@@ -104,7 +107,7 @@ function Shape({ shape, color, size }: { shape: Shape; color: string; size: numb
 export default function PatternSyncGame({ onExit }: { onExit: () => void }) {
   const { addXp, setHighScore, highScores } = useGameStore()
 
-  const [phase, setPhase] = useState<'start'|'memorize'|'find'|'over'>('start')
+  const [phase, setPhase] = useState<'start'|'howto'|'memorize'|'find'|'over'>('start')
   const [sequence, setSequence] = useState<Item[]>([])
   const [missingIdx, setMissingIdx] = useState(0)
   const [options, setOptions] = useState<Item[]>([])
@@ -121,6 +124,7 @@ export default function PatternSyncGame({ onExit }: { onExit: () => void }) {
   const seqLenRef  = useRef(3)
   const levelRef   = useRef(1)
   const correctRef = useRef(0)
+  const isAliveRef = useRef(false)
   const timerRef   = useRef<ReturnType<typeof setTimeout>>(0 as unknown as ReturnType<typeof setTimeout>)
 
   const setupRound = useCallback((len: number, lvl: number) => {
@@ -137,6 +141,7 @@ export default function PatternSyncGame({ onExit }: { onExit: () => void }) {
   const start = useCallback(() => {
     scoreRef.current = 0; livesRef.current = 3; seqLenRef.current = 3; levelRef.current = 1; correctRef.current = 0
     setScore(0); setLives(3); setSeqLen(3); setLevel(1)
+    isAliveRef.current = true
     setupRound(3, 1)
   }, [setupRound])
 
@@ -168,6 +173,7 @@ export default function PatternSyncGame({ onExit }: { onExit: () => void }) {
       setShake(true); setTimeout(() => setShake(false), 380)
       livesRef.current--; setLives(livesRef.current)
       if (livesRef.current <= 0) {
+        isAliveRef.current = false
         timerRef.current = setTimeout(() => {
           addXp(Math.floor(scoreRef.current * 0.4))
           setHighScore('pattern-sync', scoreRef.current)
@@ -185,6 +191,20 @@ export default function PatternSyncGame({ onExit }: { onExit: () => void }) {
   const xp   = Math.floor(scoreRef.current * 0.4)
   const positions = LAYOUTS[sequence.length] || LAYOUTS[3]
   const correct = sequence[missingIdx]
+
+  // ── HOW TO PLAY ───────────────────────────────────────────────────────────
+  if (phase === 'howto') {
+    return (
+      <div style={{ width:'100%', height:'100%', position:'relative' }}>
+        <HowToPlayOverlay
+          bg={BG}
+          accent="#1A1A2E"
+          bullets={TUTORIALS['pattern-sync']}
+          onStart={() => { markTutorialSeen('pattern-sync'); start() }}
+        />
+      </div>
+    )
+  }
 
   // ── START ──────────────────────────────────────────────────────────────────
   if (phase === 'start') {
@@ -211,7 +231,7 @@ export default function PatternSyncGame({ onExit }: { onExit: () => void }) {
           <h1 style={{ fontSize:30, fontWeight:900, color:'#1A1A2E', margin:'0 0 8px', letterSpacing:'0.05em' }}>PATTERN SYNC</h1>
           <p style={{ color:'#AAA', fontSize:12, fontWeight:700, letterSpacing:'0.14em', margin:0 }}>MEMORIZE. FIND. MATCH.</p>
         </div>
-        <motion.button whileTap={{ scale:0.96 }} onClick={start}
+        <motion.button whileTap={{ scale:0.96 }} onClick={() => { if (hasSeenTutorial('pattern-sync')) start(); else setPhase('howto') }}
           style={{ background:'#1A1A2E', color:BG, border:'none', borderRadius:16, padding:'16px 64px', fontSize:18, fontWeight:900, cursor:'pointer', letterSpacing:'0.12em' }}>
           PLAY
         </motion.button>
@@ -261,16 +281,22 @@ export default function PatternSyncGame({ onExit }: { onExit: () => void }) {
 
       {/* HUD */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'14px 20px 6px', flexShrink:0 }}>
-        <button onClick={onExit} style={{ background:'none', border:'none', color:'#CCC', fontSize:20, cursor:'pointer', padding:0 }}>←</button>
+        <button onClick={() => {
+          if (isAliveRef.current) {
+            isAliveRef.current = false
+            clearTimeout(timerRef.current)
+            if (scoreRef.current > 0) {
+              addXp(Math.floor(scoreRef.current * 0.4))
+              setHighScore('pattern-sync', scoreRef.current)
+            }
+          }
+          onExit()
+        }} style={{ background:'none', border:'none', color:'#CCC', fontSize:20, cursor:'pointer', padding:0 }}>←</button>
         <div style={{ textAlign:'center' }}>
           <p style={{ fontSize:9, fontWeight:700, letterSpacing:'0.15em', color:'#BBB', margin:0 }}>SCORE</p>
           <p style={{ fontSize:22, fontWeight:900, color:'#1A1A2E', margin:0, lineHeight:1.1 }}>{score.toLocaleString()}</p>
         </div>
-        <div style={{ display:'flex', gap:6, alignItems:'center' }}>
-          {[0,1,2].map(i => (
-            <div key={i} style={{ width:10, height:10, borderRadius:'50%', background: i < lives ? '#FF6B6B' : 'rgba(0,0,0,0.1)', transition:'background 0.3s' }} />
-          ))}
-        </div>
+        <LivesHearts lives={lives} maxLives={3} color="#FF6B6B" />
       </div>
 
       {/* Phase label */}

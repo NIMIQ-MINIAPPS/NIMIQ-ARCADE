@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/useGameStore'
 import { soundMuted } from '../../lib/gameAudio'
 import { vibrate } from '../../lib/haptics'
+import { hasSeenTutorial, markTutorialSeen, TUTORIALS } from '../../lib/tutorials'
+import HowToPlayOverlay from '../../components/games/HowToPlayOverlay'
 
 const BG = '#FFF9E8'
 const BOARD_BG = '#16130E'
@@ -249,7 +251,7 @@ function snd(type: 'slide' | 'clear' | 'blocked' | 'over') {
 
 export default function ShiftBlocksGame({ onExit }: { onExit: () => void }) {
   const { addXp, setHighScore, highScores } = useGameStore()
-  const [phase, setPhase] = useState<'start' | 'play' | 'over'>('start')
+  const [phase, setPhase] = useState<'start' | 'howto' | 'play' | 'over'>('start')
 
   const [level, setLevel] = useState<LevelDef>(() => levelForIndex(0))
   const [blocks, setBlocks] = useState<BlockDef[]>(() => level.blocks.map(b => ({ ...b })))
@@ -365,6 +367,19 @@ export default function ShiftBlocksGame({ onExit }: { onExit: () => void }) {
     sessionActive.current = true
     setPhase('play')
   }, [setSelectedBoth])
+
+  const handleExit = useCallback(() => {
+    if (sessionActive.current) {
+      sessionActive.current = false
+      isRunning.current = false
+      clearInterval(sessionTimer.current)
+      if (scoreRef.current > 0) {
+        addXp(Math.floor(scoreRef.current * 0.25))
+        setHighScore('shift-blocks', scoreRef.current)
+      }
+    }
+    onExit()
+  }, [addXp, setHighScore, onExit])
 
   const resetLevel = useCallback(() => {
     if (!isRunning.current) return
@@ -482,11 +497,18 @@ export default function ShiftBlocksGame({ onExit }: { onExit: () => void }) {
         <h1 style={{ fontSize: 26, fontWeight: 900, color: '#1A1A2E', margin: '0 0 8px', letterSpacing: '0.05em' }}>SHIFT BLOCKS</h1>
         <p style={{ color: '#BBB', fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', margin: 0 }}>SLIDE THE GOLD BLOCK TO THE EXIT</p>
       </div>
-      <motion.button whileTap={{ scale: 0.96 }} onClick={start}
+      <motion.button whileTap={{ scale: 0.96 }} onClick={() => { if (hasSeenTutorial('shift-blocks')) start(); else setPhase('howto') }}
         style={{ background: '#1A1A2E', color: BG, border: 'none', borderRadius: 16, padding: '16px 64px', fontSize: 18, fontWeight: 900, cursor: 'pointer', letterSpacing: '0.12em' }}>
         PLAY
       </motion.button>
       {best > 0 && <p style={{ color: '#BBB', fontSize: 13, margin: 0 }}>BEST: {best.toLocaleString()}</p>}
+    </div>
+  )
+
+  if (phase === 'howto') return (
+    <div style={{ width: '100%', height: '100%', position: 'relative', fontFamily: 'system-ui,sans-serif' }}>
+      <HowToPlayOverlay bg={BG} accent="#1A1A2E" bullets={TUTORIALS['shift-blocks']}
+        onStart={() => { markTutorialSeen('shift-blocks'); start() }} />
     </div>
   )
 
@@ -535,7 +557,7 @@ export default function ShiftBlocksGame({ onExit }: { onExit: () => void }) {
   return (
     <div style={{ width: '100%', height: '100%', background: BOARD_BG, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui,sans-serif', overflow: 'hidden' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 18px 2px', flexShrink: 0 }}>
-        <button onClick={() => { sessionActive.current = false; isRunning.current = false; clearInterval(sessionTimer.current); onExit() }} style={{ background: 'none', border: 'none', color: '#8A8270', fontSize: 20, cursor: 'pointer', padding: 0 }}>←</button>
+        <button onClick={handleExit} style={{ background: 'none', border: 'none', color: '#8A8270', fontSize: 20, cursor: 'pointer', padding: 0 }}>←</button>
         <div style={{ textAlign: 'center' }}>
           <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.15em', color: '#8A8270', margin: 0 }}>TIME</p>
           <p style={{ fontSize: 15, fontWeight: 900, color: timeLeft <= 20 ? '#FF6B6B' : BG, margin: 0, lineHeight: 1.1 }}>{formatTime(timeLeft)}</p>

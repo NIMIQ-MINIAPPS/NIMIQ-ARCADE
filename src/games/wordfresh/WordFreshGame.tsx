@@ -3,15 +3,52 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/useGameStore'
 import { soundMuted } from '../../lib/gameAudio'
 import { vibrate } from '../../lib/haptics'
+import HowToPlayOverlay from '../../components/games/HowToPlayOverlay'
+import { TUTORIALS, hasSeenTutorial, markTutorialSeen } from '../../lib/tutorials'
 
 const BG = '#FFF9E8'
 const PASTELS = ['#93DCFF', '#C4B5FD', '#86EFAC', '#FDBA74', '#FCA5A5', '#FCD34D']
 
-const WORDS_3 = ['THE', 'AND', 'FOR', 'ARE', 'BUT', 'NOT', 'YOU', 'ALL', 'CAN', 'HER', 'WAS', 'ONE', 'OUR', 'OUT', 'DAY', 'HAD', 'HOT', 'OIL', 'SIT', 'NOW', 'OLD', 'TOP', 'RED', 'SUN', 'RUN', 'FUN', 'TEN', 'BIG', 'CUT', 'PUT', 'SET', 'HIT', 'LET', 'MAP', 'DIG', 'PIN', 'WIN']
-const WORDS_4 = ['GAME', 'PLAY', 'WORD', 'FALL', 'RAIN', 'GOLD', 'JUMP', 'FISH', 'SHIP', 'WIND', 'STAR', 'FIRE', 'MOON', 'SAND', 'TREE', 'BIRD', 'WOLF', 'BEAR', 'HILL', 'LAKE', 'MINE', 'COIN', 'FLIP', 'PUSH', 'PULL', 'LIFT', 'TURN', 'SPIN', 'GLOW', 'DARK']
-const WORDS_5 = ['WORLD', 'FRESH', 'BRAIN', 'QUEST', 'FLAME', 'STORM', 'LIGHT', 'MAGIC', 'TOWER', 'STONE', 'PEARL', 'RIVER', 'DREAM', 'POWER', 'STEEL', 'SHARP', 'CORAL', 'BLOOM', 'FROST', 'OCEAN']
-const WORDS_6 = ['SPRING', 'ORANGE', 'PURPLE', 'SILVER', 'PLANET', 'DRAGON', 'ISLAND', 'WONDER', 'SPIRIT', 'FROZEN', 'GARDEN', 'MASTER']
-const ALL_WORDS = [...WORDS_3, ...WORDS_4, ...WORDS_5, ...WORDS_6]
+type Lang = 'en' | 'es'
+
+const WORDS_EN: Record<number, string[]> = {
+  3: ['THE', 'AND', 'FOR', 'ARE', 'BUT', 'NOT', 'YOU', 'ALL', 'CAN', 'HER', 'WAS', 'ONE', 'OUR', 'OUT', 'DAY', 'HAD', 'HOT', 'OIL', 'SIT', 'NOW', 'OLD', 'TOP', 'RED', 'SUN', 'RUN', 'FUN', 'TEN', 'BIG', 'CUT', 'PUT', 'SET', 'HIT', 'LET', 'MAP', 'DIG', 'PIN', 'WIN'],
+  4: ['GAME', 'PLAY', 'WORD', 'FALL', 'RAIN', 'GOLD', 'JUMP', 'FISH', 'SHIP', 'WIND', 'STAR', 'FIRE', 'MOON', 'SAND', 'TREE', 'BIRD', 'WOLF', 'BEAR', 'HILL', 'LAKE', 'MINE', 'COIN', 'FLIP', 'PUSH', 'PULL', 'LIFT', 'TURN', 'SPIN', 'GLOW', 'DARK'],
+  5: ['WORLD', 'FRESH', 'BRAIN', 'QUEST', 'FLAME', 'STORM', 'LIGHT', 'MAGIC', 'TOWER', 'STONE', 'PEARL', 'RIVER', 'DREAM', 'POWER', 'STEEL', 'SHARP', 'CORAL', 'BLOOM', 'FROST', 'OCEAN'],
+  6: ['SPRING', 'ORANGE', 'PURPLE', 'SILVER', 'PLANET', 'DRAGON', 'ISLAND', 'WONDER', 'SPIRIT', 'FROZEN', 'GARDEN', 'MASTER'],
+}
+
+const WORDS_ES: Record<number, string[]> = {
+  3: ['SOL', 'MAR', 'PAN', 'RIO', 'OSO', 'ALA', 'OJO', 'PIE', 'DIA', 'LUZ', 'VOZ', 'RED', 'TEA', 'RON', 'GAS', 'GEL', 'BAR', 'COL', 'MIL', 'MES', 'REY', 'LEY', 'CAL', 'SAL', 'TOS', 'PEZ', 'VID', 'FIN', 'ROL', 'ARO', 'UVA', 'AVE', 'OLA', 'RES', 'VEN', 'DAN', 'VAN', 'SON', 'HAY', 'MUY', 'SUR'],
+  4: ['CASA', 'MESA', 'PATO', 'GATO', 'PERO', 'TREN', 'LUNA', 'AGUA', 'VIDA', 'AMOR', 'HOJA', 'ROPA', 'PUMA', 'LOBO', 'RANA', 'MONO', 'LAGO', 'NUBE', 'FLOR', 'PASO', 'CAFE', 'VELA', 'CIMA', 'ROCA', 'ISLA', 'DUNA', 'RAMA', 'FRIO', 'HORA', 'DADO', 'HILO', 'BOCA', 'MANO', 'PATA', 'CODO', 'DEDO', 'CUNA', 'LAZO', 'RUTA', 'SOPA', 'TAZA', 'COLA', 'CERO', 'TELA', 'PISO', 'FILA'],
+  5: ['FRESA', 'NIEVE', 'VERDE', 'PLAYA', 'NOCHE', 'TARDE', 'MUNDO', 'PODER', 'MADRE', 'PADRE', 'CIELO', 'LIBRO', 'CALLE', 'TORRE', 'FUEGO', 'AGUJA', 'ABEJA', 'ARBOL', 'NUEVE', 'VIAJE', 'JOVEN', 'LLAVE', 'LUGAR', 'VOLAR', 'COMER', 'BEBER', 'DULCE', 'LIMON', 'RATON', 'CAMPO', 'PLATO'],
+  6: ['VERANO', 'PUERTA', 'GRANDE', 'MOTIVO', 'CAMINO', 'ANIMAL', 'NUMERO', 'MOLINO', 'VECINO', 'PLANTA', 'MANANA', 'DINERO', 'HOMBRE', 'PARQUE', 'BOSQUE', 'SABADO', 'NOVELA', 'ESCALA', 'MEDICO', 'CAMISA', 'ZAPATO', 'CONEJO', 'PALOMA', 'HIGADO', 'ESPEJO', 'JARDIN'],
+}
+
+const WORD_SETS: Record<Lang, Record<number, string[]>> = { en: WORDS_EN, es: WORDS_ES }
+const LANG_KEY = 'nim-arcade-wordfresh-lang'
+
+function flatWords(lang: Lang): string[] {
+  return Object.values(WORD_SETS[lang]).flat()
+}
+
+function buildLetterFreq(words: string[]): Record<string, number> {
+  const freq: Record<string, number> = {}
+  for (const w of words) for (const ch of w) freq[ch] = (freq[ch] ?? 0) + 1
+  return freq
+}
+
+function weightedLetter(freq: Record<string, number>): string {
+  const entries = Object.entries(freq)
+  if (entries.length === 0) return ALPHABET[Math.floor(Math.random() * 26)]
+  const total = entries.reduce((s, [, c]) => s + c, 0)
+  let r = Math.random() * total
+  for (const [letter, c] of entries) {
+    r -= c
+    if (r <= 0) return letter
+  }
+  return entries[entries.length - 1][0]
+}
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 const OVERFLOW_CAP = 24
@@ -51,7 +88,7 @@ function snd(type: 'pick' | 'submit' | 'invalid' | 'land' | 'over' | 'combo') {
 
 export default function WordFreshGame({ onExit }: { onExit: () => void }) {
   const { addXp, setHighScore, highScores } = useGameStore()
-  const [phase, setPhase] = useState<'start' | 'play' | 'over'>('start')
+  const [phase, setPhase] = useState<'start' | 'howto' | 'play' | 'over'>('start')
   const [score, setScore] = useState(0)
   const [level, setLevel] = useState(1)
   const [letters, setLetters] = useState<FallingLetter[]>([])
@@ -61,22 +98,31 @@ export default function WordFreshGame({ onExit }: { onExit: () => void }) {
   const [combo, setCombo] = useState(0)
   const [confetti, setConfetti] = useState<Confetto[]>([])
   const [shake, setShake] = useState(0)
+  const [language, setLanguage] = useState<Lang>(() => {
+    try { return (localStorage.getItem(LANG_KEY) as Lang) || 'en' } catch { return 'en' }
+  })
 
   const scoreRef = useRef(0), wordsRef = useRef(0), landedRef = useRef(0), comboRef = useRef(0), lastSubmit = useRef(0)
   const animRef = useRef(0), spawnRef = useRef<ReturnType<typeof setInterval>>(0 as unknown as ReturnType<typeof setInterval>)
   const isRunning = useRef(false)
+  const endedRef = useRef(false)
+  const allWordsRef = useRef<string[]>(flatWords(language))
+  const freqRef = useRef<Record<string, number>>(buildLetterFreq(allWordsRef.current))
   const containerH = 460
+
+  useEffect(() => {
+    try { localStorage.setItem(LANG_KEY, language) } catch { /* ignore */ }
+    const flat = flatWords(language)
+    allWordsRef.current = flat
+    freqRef.current = buildLetterFreq(flat)
+  }, [language])
 
   const word = selected.map(id => letters.find(l => l.id === id)?.letter ?? '').join('')
 
   const spawnLetter = useCallback(() => {
     const st = stageOf(wordsRef.current)
     const useful = Math.random() < usefulChance(st)
-    let letter: string
-    if (useful) {
-      const target = ALL_WORDS[Math.floor(Math.random() * ALL_WORDS.length)]
-      letter = target[Math.floor(Math.random() * target.length)]
-    } else letter = ALPHABET[Math.floor(Math.random() * 26)]
+    const letter = useful ? weightedLetter(freqRef.current) : ALPHABET[Math.floor(Math.random() * 26)]
     setLetters(prev => {
       if (prev.length >= maxLetters(st)) return prev
       return [...prev, { id: nextId++, letter, x: 16 + Math.random() * 284, y: -30, speed: fallSpeed(st), color: PASTELS[Math.floor(Math.random() * PASTELS.length)] }]
@@ -84,12 +130,24 @@ export default function WordFreshGame({ onExit }: { onExit: () => void }) {
   }, [])
 
   const doEnd = useCallback(() => {
+    if (endedRef.current) return
+    endedRef.current = true
     isRunning.current = false
     snd('over'); vibrate([30, 40, 60])
     addXp(Math.floor(scoreRef.current * 0.3))
     setHighScore('word-fresh', scoreRef.current)
     setPhase('over')
   }, [addXp, setHighScore])
+
+  const exitMidGame = useCallback(() => {
+    isRunning.current = false
+    if (!endedRef.current) {
+      endedRef.current = true
+      addXp(Math.floor(scoreRef.current * 0.3))
+      setHighScore('word-fresh', scoreRef.current)
+    }
+    onExit()
+  }, [addXp, setHighScore, onExit])
 
   const gameLoop = useCallback(() => {
     if (!isRunning.current) return
@@ -111,6 +169,7 @@ export default function WordFreshGame({ onExit }: { onExit: () => void }) {
   const start = useCallback(() => {
     scoreRef.current = 0; wordsRef.current = 0; landedRef.current = 0; comboRef.current = 0; lastSubmit.current = 0
     nextId = 0
+    endedRef.current = false
     setScore(0); setLevel(1); setLetters([]); setSelected([]); setLanded(0); setCombo(0)
     setFlash(null); setConfetti([]); setPhase('play')
     isRunning.current = true
@@ -144,7 +203,7 @@ export default function WordFreshGame({ onExit }: { onExit: () => void }) {
   const submitWord = useCallback(() => {
     if (word.length < 3) return
     const upper = word.toUpperCase()
-    if (ALL_WORDS.includes(upper)) {
+    if (allWordsRef.current.includes(upper)) {
       const now = Date.now()
       if (now - lastSubmit.current < COMBO_WINDOW) { comboRef.current++; } else { comboRef.current = 0 }
       lastSubmit.current = now
@@ -187,11 +246,38 @@ export default function WordFreshGame({ onExit }: { onExit: () => void }) {
         <h1 style={{ fontSize: 28, fontWeight: 900, color: '#1A1A2E', margin: '0 0 8px', letterSpacing: '0.05em' }}>WORD FRESH</h1>
         <p style={{ color: '#BBB', fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', margin: 0 }}>CATCH LETTERS · BUILD WORDS</p>
       </div>
-      <motion.button whileTap={{ scale: 0.96 }} onClick={start}
+      <div style={{ display: 'flex', gap: 6, background: 'rgba(0,0,0,0.06)', borderRadius: 12, padding: 4 }}>
+        {(['en', 'es'] as Lang[]).map(l => (
+          <button key={l} onClick={() => setLanguage(l)}
+            style={{
+              padding: '7px 20px', borderRadius: 9, border: 'none', cursor: 'pointer',
+              fontSize: 12, fontWeight: 900, letterSpacing: '0.08em',
+              background: language === l ? '#1A1A2E' : 'transparent',
+              color: language === l ? BG : '#999',
+            }}>
+            {l === 'en' ? 'EN' : 'ES'}
+          </button>
+        ))}
+      </div>
+      <motion.button whileTap={{ scale: 0.96 }} onClick={() => { if (hasSeenTutorial('word-fresh')) start(); else setPhase('howto') }}
         style={{ background: '#1A1A2E', color: BG, border: 'none', borderRadius: 16, padding: '16px 64px', fontSize: 18, fontWeight: 900, cursor: 'pointer', letterSpacing: '0.12em' }}>
         PLAY
       </motion.button>
       {best > 0 && <p style={{ color: '#BBB', fontSize: 13, margin: 0 }}>BEST: {best.toLocaleString()}</p>}
+    </div>
+  )
+
+  // ── How to play ───────────────────────────────────────────────────────
+  if (phase === 'howto') return (
+    <div style={{ width: '100%', height: '100%', position: 'relative', background: BG, fontFamily: 'system-ui,sans-serif' }}>
+      <HowToPlayOverlay
+        bg={BG}
+        accent="#1A1A2E"
+        textColor="#1A1A2E"
+        mutedColor="#BBB"
+        bullets={TUTORIALS['word-fresh']}
+        onStart={() => { markTutorialSeen('word-fresh'); start() }}
+      />
     </div>
   )
 
@@ -229,7 +315,7 @@ export default function WordFreshGame({ onExit }: { onExit: () => void }) {
   return (
     <div style={{ width: '100%', height: '100%', background: BG, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui,sans-serif', overflow: 'hidden' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 20px 4px', flexShrink: 0 }}>
-        <button onClick={() => { isRunning.current = false; onExit() }} style={{ background: 'none', border: 'none', color: '#CCC', fontSize: 20, cursor: 'pointer', padding: 0 }}>←</button>
+        <button onClick={exitMidGame} style={{ background: 'none', border: 'none', color: '#CCC', fontSize: 20, cursor: 'pointer', padding: 0 }}>←</button>
         <div style={{ display: 'flex', gap: 18, alignItems: 'center' }}>
           <div style={{ textAlign: 'center' }}>
             <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.15em', color: '#BBB', margin: 0 }}>LV</p>

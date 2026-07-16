@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/useGameStore'
+import { hasSeenTutorial, markTutorialSeen, TUTORIALS } from '../../lib/tutorials'
+import HowToPlayOverlay from '../../components/games/HowToPlayOverlay'
+import LivesHearts from '../../components/games/LivesHearts'
 
 const BG = '#FFF8E7'
 const PASTELS = ['#FFB3C6', '#B3DCFF', '#D4B3FF', '#B3F0D4', '#FFD4B3', '#FFF4B3']
@@ -76,6 +79,7 @@ type Hex = ReturnType<typeof genSet>[0]
 export default function LowPopGame({ onExit }: { onExit: () => void }) {
   const { addXp, setHighScore, highScores } = useGameStore()
   const [started, setStarted] = useState(false)
+  const [showHowTo, setShowHowTo] = useState(false)
   const [gameOver, setGameOver] = useState(false)
   const [score, setScore] = useState(0)
   const [lives, setLives] = useState(3)
@@ -156,8 +160,28 @@ export default function LowPopGame({ onExit }: { onExit: () => void }) {
 
   useEffect(() => () => { isRunning.current = false; clearInterval(timerRef.current) }, [])
 
+  const exitPlay = useCallback(() => {
+    if (isRunning.current) {
+      isRunning.current = false
+      clearInterval(timerRef.current)
+      if (scoreRef.current > 0) {
+        addXp(Math.floor(scoreRef.current * 0.4))
+        setHighScore('low-pop', scoreRef.current)
+      }
+    }
+    onExit()
+  }, [addXp, setHighScore, onExit])
+
   const best = highScores['low-pop'] ?? 0
   const xp = Math.floor(scoreRef.current * 0.4)
+
+  if (showHowTo) {
+    return (
+      <div style={{ width: '100%', height: '100%', background: BG, position: 'relative', fontFamily: 'system-ui,sans-serif' }}>
+        <HowToPlayOverlay bg={BG} accent="#222" bullets={TUTORIALS['low-pop']} onStart={() => { markTutorialSeen('low-pop'); setShowHowTo(false); start() }} />
+      </div>
+    )
+  }
 
   if (!started) {
     return (
@@ -165,7 +189,7 @@ export default function LowPopGame({ onExit }: { onExit: () => void }) {
         <button onClick={onExit} style={{ position: 'absolute', top: 20, left: 20, background: 'none', border: 'none', color: '#BBAА', fontSize: 22, cursor: 'pointer' }}>←</button>
         <h1 style={{ fontSize: 28, fontWeight: 900, color: '#222', margin: 0, letterSpacing: '0.04em' }}>LOW POP</h1>
         <p style={{ color: '#AAA', fontSize: 14, margin: 0, textAlign: 'center', padding: '0 40px' }}>Tap lowest to highest before time runs out</p>
-        <motion.button whileTap={{ scale: 0.96 }} onClick={start}
+        <motion.button whileTap={{ scale: 0.96 }} onClick={() => { if (hasSeenTutorial('low-pop')) start(); else setShowHowTo(true) }}
           style={{ background: '#222', color: BG, border: 'none', borderRadius: 16, padding: '16px 52px', fontSize: 17, fontWeight: 900, cursor: 'pointer', letterSpacing: '0.1em' }}>
           PLAY
         </motion.button>
@@ -179,7 +203,7 @@ export default function LowPopGame({ onExit }: { onExit: () => void }) {
 
       {/* HUD */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '16px 24px 10px', flexShrink: 0 }}>
-        <button onClick={onExit} style={{ background: 'none', border: 'none', color: '#CCC', fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: 0 }}>←</button>
+        <button onClick={exitPlay} style={{ background: 'none', border: 'none', color: '#CCC', fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: 0 }}>←</button>
 
         <div style={{ textAlign: 'center' }}>
           <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.16em', color: '#BBBBA', margin: 0 }}>TIME</p>
@@ -193,10 +217,8 @@ export default function LowPopGame({ onExit }: { onExit: () => void }) {
       </div>
 
       {/* Lives */}
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 8, paddingBottom: 10, flexShrink: 0 }}>
-        {[0, 1, 2].map(i => (
-          <div key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: i < lives ? '#FF6B6B' : 'rgba(0,0,0,0.1)', transition: 'background 0.3s' }} />
-        ))}
+      <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 10, flexShrink: 0 }}>
+        <LivesHearts lives={lives} maxLives={3} color="#FF6B6B" />
       </div>
 
       {/* Game area */}

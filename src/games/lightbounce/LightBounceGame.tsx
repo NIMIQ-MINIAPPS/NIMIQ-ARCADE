@@ -4,6 +4,8 @@ import { Gem, ArrowRight, RotateCcw } from 'lucide-react'
 import { useGameStore } from '../../store/useGameStore'
 import { soundMuted } from '../../lib/gameAudio'
 import { vibrate } from '../../lib/haptics'
+import { hasSeenTutorial, markTutorialSeen, TUTORIALS } from '../../lib/tutorials'
+import HowToPlayOverlay from '../../components/games/HowToPlayOverlay'
 
 const BG = '#FFF9E8'
 const BOARD_BG = '#0C0A06'
@@ -146,7 +148,7 @@ function fmtTime(sec: number) {
 
 export default function LightBounceGame({ onExit }: { onExit: () => void }) {
   const { addXp, setHighScore, highScores } = useGameStore()
-  const [phase, setPhase] = useState<'start' | 'play' | 'over'>('start')
+  const [phase, setPhase] = useState<'start' | 'howto' | 'play' | 'over'>('start')
   const [level, setLevel] = useState<LevelDef>(() => genLevel(0))
   const [mirrors, setMirrors] = useState<Record<string, Mirror>>({})
   const [score, setScore] = useState(0)
@@ -300,11 +302,17 @@ export default function LightBounceGame({ onExit }: { onExit: () => void }) {
         <h1 style={{ fontSize: 26, fontWeight: 900, color: '#1A1A2E', margin: '0 0 8px', letterSpacing: '0.05em' }}>LIGHT BOUNCE</h1>
         <p style={{ color: '#BBB', fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', margin: 0 }}>ANGLE MIRRORS TO LIGHT EVERY CRYSTAL</p>
       </div>
-      <motion.button whileTap={{ scale: 0.96 }} onClick={start}
+      <motion.button whileTap={{ scale: 0.96 }} onClick={() => { if (hasSeenTutorial('light-bounce')) start(); else setPhase('howto') }}
         style={{ background: '#1A1A2E', color: BG, border: 'none', borderRadius: 16, padding: '16px 64px', fontSize: 18, fontWeight: 900, cursor: 'pointer', letterSpacing: '0.12em' }}>
         PLAY
       </motion.button>
       {best > 0 && <p style={{ color: '#BBB', fontSize: 13, margin: 0 }}>BEST: {best.toLocaleString()}</p>}
+    </div>
+  )
+
+  if (phase === 'howto') return (
+    <div style={{ width: '100%', height: '100%', background: BG, position: 'relative', fontFamily: 'system-ui,sans-serif' }}>
+      <HowToPlayOverlay bg={BG} accent="#1A1A2E" bullets={TUTORIALS['light-bounce']} onStart={() => { markTutorialSeen('light-bounce'); start() }} />
     </div>
   )
 
@@ -352,7 +360,18 @@ export default function LightBounceGame({ onExit }: { onExit: () => void }) {
   return (
     <div style={{ width: '100%', height: '100%', background: BG, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui,sans-serif', overflow: 'hidden' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 18px 4px', flexShrink: 0 }}>
-        <button onClick={() => { isRunning.current = false; onExit() }} style={{ background: 'none', border: 'none', color: '#CCC', fontSize: 20, cursor: 'pointer', padding: 0 }}>←</button>
+        <button onClick={() => {
+          if (isRunning.current) {
+            isRunning.current = false
+            clearInterval(sessionTimer.current)
+            clearTimeout(advanceTimer.current)
+            if (scoreRef.current > 0) {
+              addXp(Math.floor(scoreRef.current * 0.3))
+              setHighScore('light-bounce', scoreRef.current)
+            }
+          }
+          onExit()
+        }} style={{ background: 'none', border: 'none', color: '#CCC', fontSize: 20, cursor: 'pointer', padding: 0 }}>←</button>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
           <div style={{ textAlign: 'center' }}>
             <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.15em', color: '#BBB', margin: 0 }}>LEVEL</p>

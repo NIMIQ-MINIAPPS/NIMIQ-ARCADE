@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/useGameStore'
 import { soundMuted } from '../../lib/gameAudio'
 import { vibrate } from '../../lib/haptics'
+import { hasSeenTutorial, markTutorialSeen, TUTORIALS } from '../../lib/tutorials'
+import HowToPlayOverlay from '../../components/games/HowToPlayOverlay'
 
 const START_BG = '#FFF9E8'
 const PAGE_BG = '#16130E'
@@ -140,7 +142,7 @@ function snd(type: 'connect' | 'levelup' | 'invalid' | 'over') {
 
 export default function ColorPathGame({ onExit }: { onExit: () => void }) {
   const { addXp, setHighScore, highScores } = useGameStore()
-  const [phase, setPhase] = useState<'start' | 'play' | 'over'>('start')
+  const [phase, setPhase] = useState<'start' | 'howto' | 'play' | 'over'>('start')
   const [level, setLevel] = useState<LevelData>(() => buildLevel(sizeForLevel(1), pairsForLevel(1, sizeForLevel(1))))
   const [levelNum, setLevelNum] = useState(1)
   const [levelsCleared, setLevelsCleared] = useState(0)
@@ -270,7 +272,14 @@ export default function ColorPathGame({ onExit }: { onExit: () => void }) {
     const pt = cellFromXY(e.clientX, e.clientY, rect, size, cellPx)
     if (!pt) return
     const pairId = findDotAt(pt, levelRef.current.pairs)
-    if (pairId == null || confirmedRef.current.has(pairId)) return
+    if (pairId == null) return
+    if (confirmedRef.current.has(pairId)) {
+      // Reopen an already-confirmed pair so it can be redrawn; the level
+      // stays locked (handleLevelClear only fires once every pair is back
+      // in confirmedRef) until it's reconnected.
+      confirmedRef.current.delete(pairId)
+      setConfirmed(Array.from(confirmedRef.current))
+    }
     try { e.currentTarget.setPointerCapture(e.pointerId) } catch {/* noop */}
     const next = { ...pathsRef.current, [pairId]: [pt] }
     pathsRef.current = next
@@ -325,6 +334,18 @@ export default function ColorPathGame({ onExit }: { onExit: () => void }) {
     setDragging(null)
   }, [])
 
+  const handleExitDuringPlay = useCallback(() => {
+    // Guard against double-firing (e.g. the session timer ending doEnd()
+    // right as this is tapped) and preserve any XP/score already earned
+    // from levels cleared this session.
+    if (isRunningRef.current) {
+      isRunningRef.current = false
+      addXp(Math.floor(scoreRef.current * 0.3))
+      setHighScore('color-path', scoreRef.current)
+    }
+    onExit()
+  }, [addXp, setHighScore, onExit])
+
   const start = useCallback(() => {
     scoreRef.current = 0; setScore(0)
     levelNumRef.current = 1; setLevelNum(1)
@@ -370,11 +391,24 @@ export default function ColorPathGame({ onExit }: { onExit: () => void }) {
         <h1 style={{ fontSize: 28, fontWeight: 900, color: '#1A1A2E', margin: '0 0 8px', letterSpacing: '0.05em' }}>COLOR PATH</h1>
         <p style={{ color: '#BBB', fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', margin: 0 }}>CONNECT DOTS WITHOUT CROSSING</p>
       </div>
-      <motion.button whileTap={{ scale: 0.96 }} onClick={start}
+      <motion.button whileTap={{ scale: 0.96 }} onClick={() => { if (hasSeenTutorial('color-path')) start(); else setPhase('howto') }}
         style={{ background: '#1A1A2E', color: START_BG, border: 'none', borderRadius: 16, padding: '16px 64px', fontSize: 18, fontWeight: 900, cursor: 'pointer', letterSpacing: '0.12em' }}>
         PLAY
       </motion.button>
       {best > 0 && <p style={{ color: '#BBB', fontSize: 13, margin: 0 }}>BEST: {best.toLocaleString()}</p>}
+    </div>
+  )
+
+  if (phase === 'howto') return (
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <HowToPlayOverlay
+        bg={START_BG}
+        accent="#1A1A2E"
+        textColor="#1A1A2E"
+        mutedColor="#BBB"
+        bullets={TUTORIALS['color-path']}
+        onStart={() => { markTutorialSeen('color-path'); start() }}
+      />
     </div>
   )
 
@@ -411,7 +445,7 @@ export default function ColorPathGame({ onExit }: { onExit: () => void }) {
   return (
     <div style={{ width: '100%', height: '100%', background: PAGE_BG, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui,sans-serif', overflow: 'hidden' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 20px 4px', flexShrink: 0 }}>
-        <button onClick={() => { isRunningRef.current = false; onExit() }} style={{ background: 'none', border: 'none', color: '#5A5648', fontSize: 20, cursor: 'pointer', padding: 0 }}>←</button>
+        <button onClick={handleExitDuringPlay} style={{ background: 'none', border: 'none', color: '#5A5648', fontSize: 20, cursor: 'pointer', padding: 0 }}>←</button>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
           <div style={{ textAlign: 'center' }}>
             <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.15em', color: TEXT_MUTED, margin: 0 }}>LEVEL</p>

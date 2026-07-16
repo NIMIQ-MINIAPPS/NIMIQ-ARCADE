@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/useGameStore'
+import { hasSeenTutorial, markTutorialSeen, TUTORIALS } from '../../lib/tutorials'
+import HowToPlayOverlay from '../../components/games/HowToPlayOverlay'
 
 const BG = '#FFF9E8'
 
@@ -115,7 +117,7 @@ function snd(type: 'flip' | 'match' | 'wrong' | 'round' | 'shuffle' | 'doom') {
 export default function MemoryGame({ onExit }: { onExit: () => void }) {
   const { addXp, setHighScore, highScores } = useGameStore()
 
-  const [phase,     setPhase]     = useState<'start'|'play'|'over'>('start')
+  const [phase,     setPhase]     = useState<'start'|'howto'|'play'|'over'>('start')
   const [round,     setRound]     = useState(1)
   const [score,     setScore]     = useState(0)
   const [cards,     setCards]     = useState<Card[]>([])
@@ -127,16 +129,31 @@ export default function MemoryGame({ onExit }: { onExit: () => void }) {
 
   const scoreRef  = useRef(0), roundRef = useRef(1), streakRef = useRef(0)
   const lockRef   = useRef(false)
+  const activeRef = useRef(false)
   const timerRef  = useRef<ReturnType<typeof setInterval>>(0 as unknown as ReturnType<typeof setInterval>)
   const shuffRef  = useRef<ReturnType<typeof setInterval>>(0 as unknown as ReturnType<typeof setInterval>)
 
   const endGame = useCallback(() => {
+    if (!activeRef.current) return
+    activeRef.current = false
     clearInterval(timerRef.current); clearInterval(shuffRef.current)
     snd('doom')
     addXp(Math.floor(scoreRef.current * 0.35))
     setHighScore('memory', scoreRef.current)
     setPhase('over')
   }, [addXp, setHighScore])
+
+  const handleExit = useCallback(() => {
+    if (activeRef.current) {
+      activeRef.current = false
+      clearInterval(timerRef.current); clearInterval(shuffRef.current)
+      if (scoreRef.current > 0) {
+        addXp(Math.floor(scoreRef.current * 0.35))
+        setHighScore('memory', scoreRef.current)
+      }
+    }
+    onExit()
+  }, [addXp, setHighScore, onExit])
 
   const startRound = useCallback((r: number) => {
     const newCards = buildCards(r)
@@ -170,6 +187,7 @@ export default function MemoryGame({ onExit }: { onExit: () => void }) {
 
   const startGame = useCallback(() => {
     scoreRef.current = 0; roundRef.current = 1; streakRef.current = 0
+    activeRef.current = true
     setScore(0); setRound(1); setStreak(0); setFlash(null)
     startRound(1)
     setPhase('play')
@@ -250,11 +268,21 @@ export default function MemoryGame({ onExit }: { onExit: () => void }) {
           <h1 style={{ fontSize:28, fontWeight:900, color:'#1A1A2E', margin:'0 0 8px', letterSpacing:'0.05em' }}>MEMORY RUSH</h1>
           <p style={{ color:'#BBB', fontSize:11, fontWeight:700, letterSpacing:'0.14em', margin:0 }}>MATCH COLORS & SYMBOLS</p>
         </div>
-        <motion.button whileTap={{ scale:0.96 }} onClick={startGame}
+        <motion.button whileTap={{ scale:0.96 }} onClick={() => { if (hasSeenTutorial('memory')) startGame(); else setPhase('howto') }}
           style={{ background:'#1A1A2E', color:BG, border:'none', borderRadius:16, padding:'16px 64px', fontSize:18, fontWeight:900, cursor:'pointer', letterSpacing:'0.12em' }}>
           PLAY
         </motion.button>
         {best > 0 && <p style={{ color:'#BBB', fontSize:13, margin:0 }}>BEST: {best.toLocaleString()}</p>}
+      </div>
+    )
+  }
+
+  // ── HOW TO PLAY ───────────────────────────────────────────────────────────
+  if (phase === 'howto') {
+    return (
+      <div style={{ width:'100%', height:'100%', position:'relative', fontFamily:'system-ui,sans-serif' }}>
+        <HowToPlayOverlay bg={BG} accent="#1A1A2E" bullets={TUTORIALS['memory']}
+          onStart={() => { markTutorialSeen('memory'); startGame() }} />
       </div>
     )
   }
@@ -308,7 +336,7 @@ export default function MemoryGame({ onExit }: { onExit: () => void }) {
 
       {/* HUD */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 20px 4px', flexShrink:0 }}>
-        <button onClick={onExit} style={{ background:'none', border:'none', color:'#CCC', fontSize:20, cursor:'pointer', padding:0 }}>←</button>
+        <button onClick={handleExit} style={{ background:'none', border:'none', color:'#CCC', fontSize:20, cursor:'pointer', padding:0 }}>←</button>
         <div style={{ textAlign:'center' }}>
           <p style={{ fontSize:9, fontWeight:700, letterSpacing:'0.15em', color:'#BBB', margin:0 }}>SCORE</p>
           <p style={{ fontSize:20, fontWeight:900, color:'#1A1A2E', margin:0, lineHeight:1.1 }}>{score.toLocaleString()}</p>

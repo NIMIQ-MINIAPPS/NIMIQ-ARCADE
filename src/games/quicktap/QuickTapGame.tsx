@@ -1,6 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/useGameStore'
+import HowToPlayOverlay from '../../components/games/HowToPlayOverlay'
+import { hasSeenTutorial, markTutorialSeen, TUTORIALS } from '../../lib/tutorials'
 
 const BG = '#FFF9E8'
 const PASTEL_COLS = ['#93DCFF','#C4B5FD','#86EFAC','#FDBA74','#FCA5A5','#FCD34D']
@@ -103,7 +105,7 @@ export default function QuickTapGame({ onExit }: { onExit: () => void }) {
   const { addXp, setHighScore, highScores } = useGameStore()
   const areaRef = useRef<HTMLDivElement>(null)
 
-  const [phase,   setPhase]   = useState<'start'|'play'|'over'>('start')
+  const [phase,   setPhase]   = useState<'start'|'howto'|'play'|'over'>('start')
   const [targets, setTargets] = useState<Target[]>([])
   const [flashes, setFlashes] = useState<Flash[]>([])
   const [score,   setScore]   = useState(0)
@@ -254,11 +256,19 @@ export default function QuickTapGame({ onExit }: { onExit: () => void }) {
         <h1 style={{ fontSize:28,fontWeight:900,color:'#1A1A2E',margin:'0 0 8px',letterSpacing:'0.05em' }}>QUICK TAP</h1>
         <p style={{ color:'#BBB',fontSize:11,fontWeight:700,letterSpacing:'0.14em',margin:0 }}>TAP · REACT · REPEAT</p>
       </div>
-      <motion.button whileTap={{ scale:0.96 }} onClick={startGame}
+      <motion.button whileTap={{ scale:0.96 }} onClick={() => { if (hasSeenTutorial('quicktap')) startGame(); else setPhase('howto') }}
         style={{ background:'#1A1A2E',color:BG,border:'none',borderRadius:16,padding:'16px 64px',fontSize:18,fontWeight:900,cursor:'pointer',letterSpacing:'0.12em' }}>
         PLAY
       </motion.button>
       {best>0 && <p style={{ color:'#BBB',fontSize:13,margin:0 }}>BEST: {best.toLocaleString()}</p>}
+    </div>
+  )
+
+  // ── HOW TO PLAY ───────────────────────────────────────────────────────────
+  if (phase === 'howto') return (
+    <div style={{ width:'100%',height:'100%',position:'relative',fontFamily:'system-ui,sans-serif' }}>
+      <HowToPlayOverlay bg={BG} accent="#93DCFF" bullets={TUTORIALS['quicktap']}
+        onStart={() => { markTutorialSeen('quicktap'); startGame() }} />
     </div>
   )
 
@@ -296,7 +306,13 @@ export default function QuickTapGame({ onExit }: { onExit: () => void }) {
 
       {/* HUD */}
       <div style={{ display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 20px 4px',flexShrink:0 }}>
-        <button onClick={()=>{ alive.current=false; onExit() }}
+        <button onClick={()=>{
+            if (alive.current) {
+              alive.current=false
+              if (scoreRef.current>0) { addXp(Math.floor(scoreRef.current*0.5)); setHighScore('quicktap', scoreRef.current) }
+            }
+            onExit()
+          }}
           style={{ background:'none',border:'none',color:'#CCC',fontSize:20,cursor:'pointer',padding:0 }}>←</button>
         <div style={{ textAlign:'center' }}>
           <p style={{ fontSize:9,fontWeight:700,letterSpacing:'0.15em',color:'#BBB',margin:0 }}>SCORE</p>

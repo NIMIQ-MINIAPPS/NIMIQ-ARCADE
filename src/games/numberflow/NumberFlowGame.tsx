@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/useGameStore'
 import { soundMuted } from '../../lib/gameAudio'
 import { vibrate } from '../../lib/haptics'
+import HowToPlayOverlay from '../../components/games/HowToPlayOverlay'
+import { hasSeenTutorial, markTutorialSeen, TUTORIALS } from '../../lib/tutorials'
 
 const BG = '#FFF9E8'
 const OPS = ['+', '-', '×'] as const
@@ -60,7 +62,7 @@ function snd(type: 'correct' | 'wrong' | 'tick' | 'over' | 'milestone') {
 export default function NumberFlowGame({ onExit }: { onExit: () => void }) {
   const { addXp, setHighScore, highScores } = useGameStore()
 
-  const [phase, setPhase] = useState<'start' | 'play' | 'over'>('start')
+  const [phase, setPhase] = useState<'start' | 'howto' | 'play' | 'over'>('start')
   const [problem, setProblem] = useState<Problem>(() => genProblem(null, 1))
   const [score, setScore] = useState(0)
   const [chain, setChain] = useState(0)
@@ -155,6 +157,18 @@ export default function NumberFlowGame({ onExit }: { onExit: () => void }) {
 
   const best = highScores['number-flow'] ?? 0
 
+  // ── How to play ──────────────────────────────────────────────────────
+  if (phase === 'howto') return (
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <HowToPlayOverlay
+        bg={BG}
+        accent="#1A1A2E"
+        bullets={TUTORIALS['number-flow']}
+        onStart={() => { markTutorialSeen('number-flow'); start() }}
+      />
+    </div>
+  )
+
   // ── Start screen ──────────────────────────────────────────────────────
   if (phase === 'start') return (
     <div style={{ width: '100%', height: '100%', background: BG, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 24, fontFamily: 'system-ui,sans-serif', position: 'relative' }}>
@@ -171,7 +185,7 @@ export default function NumberFlowGame({ onExit }: { onExit: () => void }) {
         <h1 style={{ fontSize: 28, fontWeight: 900, color: '#1A1A2E', margin: '0 0 8px', letterSpacing: '0.05em' }}>NUMBER FLOW</h1>
         <p style={{ color: '#BBB', fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', margin: 0 }}>CHAIN THE ANSWERS · 60s</p>
       </div>
-      <motion.button whileTap={{ scale: 0.96 }} onClick={start}
+      <motion.button whileTap={{ scale: 0.96 }} onClick={() => { if (hasSeenTutorial('number-flow')) start(); else setPhase('howto') }}
         style={{ background: '#1A1A2E', color: BG, border: 'none', borderRadius: 16, padding: '16px 64px', fontSize: 18, fontWeight: 900, cursor: 'pointer', letterSpacing: '0.12em' }}>
         PLAY
       </motion.button>
@@ -210,7 +224,17 @@ export default function NumberFlowGame({ onExit }: { onExit: () => void }) {
   return (
     <div style={{ width: '100%', height: '100%', background: BG, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui,sans-serif', overflow: 'hidden' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 20px 4px', flexShrink: 0 }}>
-        <button onClick={() => { isRunning.current = false; onExit() }} style={{ background: 'none', border: 'none', color: '#CCC', fontSize: 20, cursor: 'pointer', padding: 0 }}>←</button>
+        <button onClick={() => {
+          if (isRunning.current) {
+            isRunning.current = false
+            clearInterval(gameTimer.current); clearInterval(barTimer.current)
+            if (scoreRef.current > 0) {
+              addXp(Math.floor(scoreRef.current * 0.35))
+              setHighScore('number-flow', scoreRef.current)
+            }
+          }
+          onExit()
+        }} style={{ background: 'none', border: 'none', color: '#CCC', fontSize: 20, cursor: 'pointer', padding: 0 }}>←</button>
         <div style={{ textAlign: 'center' }}>
           <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.15em', color: '#BBB', margin: 0 }}>TIME</p>
           <p style={{ fontSize: 18, fontWeight: 900, color: timeLeft <= 10 ? '#FF6B6B' : '#1A1A2E', margin: 0, lineHeight: 1.1 }}>{timeLeft}s</p>

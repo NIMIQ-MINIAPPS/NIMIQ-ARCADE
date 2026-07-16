@@ -3,9 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/useGameStore'
 import { soundMuted } from '../../lib/gameAudio'
 import { vibrate } from '../../lib/haptics'
+import LivesHearts from '../../components/games/LivesHearts'
+import HowToPlayOverlay from '../../components/games/HowToPlayOverlay'
+import { hasSeenTutorial, markTutorialSeen, TUTORIALS } from '../../lib/tutorials'
 
 const BG = '#FFF9E8'
 const W = 390, H = 580, PC = '#FF9F43'
+const INITIAL_LIVES = 3
+const GAME_ID = 'space-raid'
 
 type EnemyType = 'grunt' | 'heavy' | 'sniper' | 'boss'
 type PowerType = 'weapon' | 'shield' | 'speed'
@@ -123,10 +128,10 @@ export default function SpaceRaidGame({ onExit }: { onExit: () => void }) {
   const { addXp, setHighScore, highScores } = useGameStore()
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
-  const [phase, setPhase] = useState<'start' | 'play' | 'over'>('start')
+  const [phase, setPhase] = useState<'start' | 'howto' | 'play' | 'over'>('start')
   const [score, setScore] = useState(0)
   const [wave, setWave] = useState(1)
-  const [lives, setLives] = useState(3)
+  const [lives, setLives] = useState(INITIAL_LIVES)
   const [waveMsg, setWaveMsg] = useState<string | null>(null)
   const [powerBadges, setPowerBadges] = useState<PowerType[]>([])
 
@@ -137,7 +142,9 @@ export default function SpaceRaidGame({ onExit }: { onExit: () => void }) {
   const parts = useRef<Particle[]>([])
   const powers = useRef<Power[]>([])
   const activePowers = useRef<{ weapon: number; shield: number; speed: number }>({ weapon: 0, shield: 0, speed: 0 })
-  const scoreRef = useRef(0), waveRef = useRef(1), livesRef = useRef(3)
+  const scoreRef = useRef(0), waveRef = useRef(1), livesRef = useRef(INITIAL_LIVES)
+  const transitioning = useRef(false)
+  const ended = useRef(false)
 
   const stars = useRef(Array.from({ length: 60 }, (_, i) => ({ x: (i * 97 + i * i * 13) % W, y: (i * 53 + i * i * 7) % H, s: i % 5 === 0 ? 1.5 : i % 3 === 0 ? 1.0 : 0.6 })))
 
@@ -160,12 +167,28 @@ export default function SpaceRaidGame({ onExit }: { onExit: () => void }) {
   }, [])
 
   const doEnd = useCallback(() => {
+    if (ended.current) return
+    ended.current = true
     alive.current = false; snd('over'); vibrate([30, 40, 60])
     cancelAnimationFrame(raf.current)
     addXp(Math.floor(scoreRef.current * 0.3))
-    setHighScore('space-raid', scoreRef.current)
+    setHighScore(GAME_ID, scoreRef.current)
     setPhase('over')
   }, [addXp, setHighScore])
+
+  // Exit mid-game (back button during play): keep whatever XP/score was
+  // earned so far using the same formula as a natural game over, guarded
+  // so it never double-fires alongside doEnd.
+  const exitMidGame = useCallback(() => {
+    if (!ended.current) {
+      ended.current = true
+      addXp(Math.floor(scoreRef.current * 0.3))
+      setHighScore(GAME_ID, scoreRef.current)
+    }
+    alive.current = false
+    cancelAnimationFrame(raf.current)
+    onExit()
+  }, [addXp, setHighScore, onExit])
 
   useEffect(() => {
     if (phase !== 'play') { cancelAnimationFrame(raf.current); return }
@@ -190,18 +213,23 @@ export default function SpaceRaidGame({ onExit }: { onExit: () => void }) {
       const dx = shipTargetX.current - shipX.current
       shipX.current += Math.max(-moveSpeed, Math.min(moveSpeed, dx))
 
-      shootT.current++
-      const baseRate = Math.max(9, 20 - Math.floor(waveRef.current * 0.4))
-      const rate = ap.weapon > 0 ? Math.max(5, Math.floor(baseRate * 0.55)) : baseRate
-      if (shootT.current % rate === 0) {
-        if (ap.weapon > 0) {
-          bullets.current.push({ id: ++_id, x: shipX.current - 8, y: CH - 80, vx: -1, vy: -11, fromEnemy: false })
-          bullets.current.push({ id: ++_id, x: shipX.current, y: CH - 80, vx: 0, vy: -11, fromEnemy: false })
-          bullets.current.push({ id: ++_id, x: shipX.current + 8, y: CH - 80, vx: 1, vy: -11, fromEnemy: false })
-        } else {
-          bullets.current.push({ id: ++_id, x: shipX.current, y: CH - 80, vx: 0, vy: -11, fromEnemy: false })
+      // Difficulty scaling is capped at wave 20 so late waves plateau
+      // instead of climbing forever.
+      const diffWave = Math.min(waveRef.current, 20)
+      if (!transitioning.current) {
+        shootT.current++
+        const baseRate = Math.max(9, 20 - Math.floor(diffWave * 0.4))
+        const rate = ap.weapon > 0 ? Math.max(5, Math.floor(baseRate * 0.55)) : baseRate
+        if (shootT.current % rate === 0) {
+          if (ap.weapon > 0) {
+            bullets.current.push({ id: ++_id, x: shipX.current - 8, y: CH - 80, vx: -1, vy: -11, fromEnemy: false })
+            bullets.current.push({ id: ++_id, x: shipX.current, y: CH - 80, vx: 0, vy: -11, fromEnemy: false })
+            bullets.current.push({ id: ++_id, x: shipX.current + 8, y: CH - 80, vx: 1, vy: -11, fromEnemy: false })
+          } else {
+            bullets.current.push({ id: ++_id, x: shipX.current, y: CH - 80, vx: 0, vy: -11, fromEnemy: false })
+          }
+          snd('shoot')
         }
-        snd('shoot')
       }
       if (flashT.current > 0) flashT.current--
 
@@ -212,10 +240,13 @@ export default function SpaceRaidGame({ onExit }: { onExit: () => void }) {
         else { e.x += e.vx; e.y += e.vy }
         const hw = CFG[e.type].hw + 4
         if (e.x < hw || e.x > CW - hw) { e.vx *= -1; e.x = Math.max(hw, Math.min(e.x, CW - hw)) }
-        if (e.type === 'boss' && e.y < 70) e.y = Math.min(e.y + e.vy, 70)
+        // Clamp the boss's descent at y=70 without re-adding vy on top of the
+        // movement already applied above — the old code doubled its speed
+        // while approaching and made it hover unevenly.
+        if (e.type === 'boss') e.y = Math.min(e.y, 70)
       })
 
-      const eShootChance = 0.004 + waveRef.current * 0.0016
+      const eShootChance = 0.004 + diffWave * 0.0016
       enemies.current.forEach(e => {
         const chance = e.type === 'boss' ? 0.035 : eShootChance
         if (Math.random() < chance) bullets.current.push({ id: ++_id, x: e.x, y: e.y + CFG[e.type].hh, vx: e.type === 'boss' ? (shipX.current - e.x) * 0.01 : 0, vy: 3.4 + waveRef.current * 0.12, fromEnemy: true })
@@ -275,13 +306,20 @@ export default function SpaceRaidGame({ onExit }: { onExit: () => void }) {
 
       if (enemies.current.some(e => e.type !== 'boss' && e.y + CFG[e.type].hh > CH - 50)) { doEnd(); return }
 
-      if (enemies.current.length === 0) {
-        const wasBoss = waveRef.current % 5 === 0
-        snd(wasBoss ? 'boss' : 'wave')
-        waveRef.current++; setWave(waveRef.current)
-        setWaveMsg(waveRef.current % 5 === 0 ? 'BOSS INCOMING' : `WAVE ${waveRef.current}`)
-        setTimeout(() => setWaveMsg(null), 1600)
-        enemies.current = waveEnemies(waveRef.current)
+      // Brief "get ready" pause before the next wave's enemies actually
+      // spawn/move, instead of throwing the player straight into it.
+      if (enemies.current.length === 0 && !transitioning.current) {
+        transitioning.current = true
+        const clearedWave = waveRef.current
+        const nextWave = clearedWave + 1
+        snd(clearedWave % 5 === 0 ? 'boss' : 'wave')
+        setWaveMsg(nextWave % 5 === 0 ? 'BOSS INCOMING' : `WAVE ${nextWave}`)
+        setTimeout(() => {
+          waveRef.current = nextWave; setWave(nextWave)
+          enemies.current = waveEnemies(nextWave)
+          setWaveMsg(null)
+          transitioning.current = false
+        }, 1000)
       }
 
       parts.current = parts.current.map(p => ({ ...p, x: p.x + p.vx, y: p.y + p.vy, vy: p.vy + 0.1, life: p.life - 1 })).filter(p => p.life > 0)
@@ -347,14 +385,15 @@ export default function SpaceRaidGame({ onExit }: { onExit: () => void }) {
     bullets.current = []; enemies.current = waveEnemies(1); parts.current = []; powers.current = []
     activePowers.current = { weapon: 0, shield: 0, speed: 0 }
     shipX.current = W / 2; shipTargetX.current = W / 2; shootT.current = 0; flashT.current = 0
-    scoreRef.current = 0; waveRef.current = 1; livesRef.current = 3
-    setScore(0); setWave(1); setLives(3); setWaveMsg(null); setPowerBadges([])
+    scoreRef.current = 0; waveRef.current = 1; livesRef.current = INITIAL_LIVES
+    transitioning.current = false; ended.current = false
+    setScore(0); setWave(1); setLives(INITIAL_LIVES); setWaveMsg(null); setPowerBadges([])
     setPhase('play')
   }, [])
 
   useEffect(() => () => { alive.current = false; cancelAnimationFrame(raf.current) }, [])
 
-  const best = highScores['space-raid'] ?? 0
+  const best = highScores[GAME_ID] ?? 0
 
   if (phase === 'start') return (
     <div style={{ width: '100%', height: '100%', background: BG, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 24, fontFamily: 'system-ui,sans-serif', position: 'relative' }}>
@@ -375,11 +414,23 @@ export default function SpaceRaidGame({ onExit }: { onExit: () => void }) {
         <h1 style={{ fontSize: 28, fontWeight: 900, color: '#1A1A2E', margin: '0 0 8px', letterSpacing: '0.05em' }}>SPACE RAID</h1>
         <p style={{ color: '#BBB', fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', margin: 0 }}>SLIDE TO MOVE · AUTO-FIRE · BOSS EVERY 5 WAVES</p>
       </div>
-      <motion.button whileTap={{ scale: 0.96 }} onClick={startGame}
+      <motion.button whileTap={{ scale: 0.96 }}
+        onClick={() => { if (hasSeenTutorial(GAME_ID)) startGame(); else setPhase('howto') }}
         style={{ background: '#1A1A2E', color: BG, border: 'none', borderRadius: 16, padding: '16px 64px', fontSize: 18, fontWeight: 900, cursor: 'pointer', letterSpacing: '0.12em' }}>
         PLAY
       </motion.button>
       {best > 0 && <p style={{ color: '#BBB', fontSize: 13, margin: 0 }}>BEST: {best.toLocaleString()}</p>}
+    </div>
+  )
+
+  if (phase === 'howto') return (
+    <div style={{ width: '100%', height: '100%', position: 'relative', background: '#1A0E0A' }}>
+      <HowToPlayOverlay
+        bg="#1A0E0A"
+        accent="#FF9F43"
+        bullets={TUTORIALS[GAME_ID]}
+        onStart={() => { markTutorialSeen(GAME_ID); startGame() }}
+      />
     </div>
   )
 
@@ -411,7 +462,7 @@ export default function SpaceRaidGame({ onExit }: { onExit: () => void }) {
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: '#1A0E0A', fontFamily: 'system-ui,sans-serif' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 20px 6px', flexShrink: 0 }}>
-        <button onClick={() => { alive.current = false; cancelAnimationFrame(raf.current); onExit() }}
+        <button onClick={exitMidGame}
           style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)', fontSize: 20, cursor: 'pointer', padding: 0 }}>←</button>
         <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
           <div style={{ textAlign: 'center' }}>
@@ -423,11 +474,7 @@ export default function SpaceRaidGame({ onExit }: { onExit: () => void }) {
             <p style={{ fontSize: 20, fontWeight: 900, color: 'white', margin: 0, lineHeight: 1.1 }}>{score.toLocaleString()}</p>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 5 }}>
-          {[0, 1, 2].map(i => (
-            <div key={i} style={{ width: 11, height: 11, borderRadius: '50%', background: i < lives ? PC : 'rgba(255,255,255,0.1)', boxShadow: i < lives ? `0 0 6px ${PC}` : 'none' }} />
-          ))}
-        </div>
+        <LivesHearts lives={lives} maxLives={INITIAL_LIVES} color="#FF6B6B" />
       </div>
 
       {powerBadges.length > 0 && (

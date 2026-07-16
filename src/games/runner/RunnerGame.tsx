@@ -1,6 +1,8 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useGameStore } from '../../store/useGameStore'
+import HowToPlayOverlay from '../../components/games/HowToPlayOverlay'
+import { hasSeenTutorial, markTutorialSeen, TUTORIALS } from '../../lib/tutorials'
 
 const BG = '#FFF8E8'
 const W = 380, H = 400
@@ -77,7 +79,7 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
   const { addXp, setHighScore, highScores } = useGameStore()
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
-  const [phase, setPhase] = useState<'start'|'play'|'over'>('start')
+  const [phase, setPhase] = useState<'start'|'howto'|'play'|'over'>('start')
   const [distDisp,  setDistDisp]  = useState(0)
   const [scoreDisp, setScoreDisp] = useState(0)
 
@@ -246,11 +248,18 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
         <h1 style={{ fontSize:28,fontWeight:900,color:'#1A1A2E',margin:'0 0 8px',letterSpacing:'0.05em' }}>HEX RUNNER</h1>
         <p style={{ color:'#BBB',fontSize:11,fontWeight:700,letterSpacing:'0.14em',margin:0 }}>JUMP · DODGE · SURVIVE</p>
       </div>
-      <motion.button whileTap={{ scale:0.96 }} onClick={startGame}
+      <motion.button whileTap={{ scale:0.96 }} onClick={() => { if (hasSeenTutorial('runner')) startGame(); else setPhase('howto') }}
         style={{ background:'#1A1A2E',color:BG,border:'none',borderRadius:16,padding:'16px 64px',fontSize:18,fontWeight:900,cursor:'pointer',letterSpacing:'0.12em' }}>
         PLAY
       </motion.button>
       {best>0 && <p style={{ color:'#BBB',fontSize:13,margin:0 }}>BEST: {best.toLocaleString()}</p>}
+    </div>
+  )
+
+  if (phase === 'howto') return (
+    <div style={{ width:'100%',height:'100%',position:'relative',fontFamily:'system-ui,sans-serif' }}>
+      <HowToPlayOverlay bg={BG} accent={PC} bullets={TUTORIALS['runner']}
+        onStart={() => { markTutorialSeen('runner'); startGame() }} />
     </div>
   )
 
@@ -283,7 +292,13 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
     <div style={{ width:'100%',height:'100%',background:BG,display:'flex',flexDirection:'column',fontFamily:'system-ui,sans-serif' }}>
       {/* HUD */}
       <div style={{ display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 20px 4px',flexShrink:0 }}>
-        <button onClick={()=>{ alive.current=false; onExit() }}
+        <button onClick={()=>{
+            if (alive.current) {
+              alive.current=false
+              if (sc.current>0) { addXp(Math.floor(sc.current*0.3)); setHighScore('runner', sc.current) }
+            }
+            onExit()
+          }}
           style={{ background:'none',border:'none',color:'#CCC',fontSize:20,cursor:'pointer',padding:0 }}>←</button>
         <div style={{ textAlign:'center' }}>
           <p style={{ fontSize:9,fontWeight:700,letterSpacing:'0.15em',color:'#BBB',margin:0 }}>DISTANCE</p>

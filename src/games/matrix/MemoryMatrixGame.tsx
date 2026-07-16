@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/useGameStore'
+import LivesHearts from '../../components/games/LivesHearts'
+import HowToPlayOverlay from '../../components/games/HowToPlayOverlay'
+import { hasSeenTutorial, markTutorialSeen, TUTORIALS } from '../../lib/tutorials'
 
 const C = {
   memorize: '#4DA8FF',
@@ -88,6 +91,7 @@ type Badge = 'combo' | 'perfect' | 'levelup'
 export default function MemoryMatrixGame({ onExit }: { onExit: () => void }) {
   const { addXp, setHighScore, highScores } = useGameStore()
   const [started, setStarted] = useState(false)
+  const [howTo, setHowTo] = useState(false)
   const [gameOver, setGameOver] = useState(false)
   const [phase, setPhase] = useState<'memorize' | 'countdown' | 'recall'>('memorize')
   const [countdown, setCountdown] = useState<3 | 2 | 1 | null>(null)
@@ -108,6 +112,7 @@ export default function MemoryMatrixGame({ onExit }: { onExit: () => void }) {
   const scoreRef = useRef(0)
   const levelRef = useRef(1)
   const livesRef = useRef(3)
+  const isAliveRef = useRef(false)
   const comboRef = useRef(0)
   const wrongInLevelRef = useRef(0)
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
@@ -178,6 +183,7 @@ export default function MemoryMatrixGame({ onExit }: { onExit: () => void }) {
     scoreRef.current = 0; levelRef.current = 1; livesRef.current = 3; comboRef.current = 0
     setScore(0); setLevel(1); setLives(3); setCombo(0)
     setGameOver(false); setStarted(true); setBadge(null)
+    isAliveRef.current = true
     setupLevel(1)
   }, [clearAll, setupLevel])
 
@@ -224,6 +230,7 @@ export default function MemoryMatrixGame({ onExit }: { onExit: () => void }) {
 
       if (livesRef.current <= 0) {
         snd('doom')
+        isAliveRef.current = false
         clearAll()
         addXp(Math.floor(scoreRef.current * 0.4))
         setHighScore('memory-matrix', scoreRef.current)
@@ -254,6 +261,20 @@ export default function MemoryMatrixGame({ onExit }: { onExit: () => void }) {
     : 'LEVEL UP'
 
   if (!started) {
+    if (howTo) {
+      return (
+        <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+          <HowToPlayOverlay
+            bg={BG}
+            accent={C.memorize}
+            textColor={C.text}
+            mutedColor={C.muted}
+            bullets={TUTORIALS['memory-matrix']}
+            onStart={() => { markTutorialSeen('memory-matrix'); setHowTo(false); start() }}
+          />
+        </div>
+      )
+    }
     return (
       <div style={{ width: '100%', height: '100%', background: BG, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 28, fontFamily: 'system-ui,sans-serif', position: 'relative' }}>
         <button onClick={onExit} style={{ position: 'absolute', top: 20, left: 20, background: 'none', border: 'none', color: C.muted, fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>←</button>
@@ -267,7 +288,7 @@ export default function MemoryMatrixGame({ onExit }: { onExit: () => void }) {
           <h1 style={{ fontSize: 24, fontWeight: 900, color: C.text, margin: '0 0 4px', letterSpacing: '0.06em' }}>MEMORY MATRIX</h1>
           <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>Recall the pattern</p>
         </div>
-        <motion.button whileTap={{ scale: 0.96 }} onClick={start} style={{ background: C.memorize, color: '#fff', border: 'none', borderRadius: 16, padding: '16px 52px', fontSize: 18, fontWeight: 900, cursor: 'pointer', boxShadow: `0 6px 24px ${C.memorize}55`, letterSpacing: '0.1em' }}>
+        <motion.button whileTap={{ scale: 0.96 }} onClick={() => { if (hasSeenTutorial('memory-matrix')) start(); else setHowTo(true) }} style={{ background: C.memorize, color: '#fff', border: 'none', borderRadius: 16, padding: '16px 52px', fontSize: 18, fontWeight: 900, cursor: 'pointer', boxShadow: `0 6px 24px ${C.memorize}55`, letterSpacing: '0.1em' }}>
           PLAY
         </motion.button>
         {best > 0 && <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>BEST: {best.toLocaleString()}</p>}
@@ -288,7 +309,17 @@ export default function MemoryMatrixGame({ onExit }: { onExit: () => void }) {
 
       {/* HUD */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px 8px', flexShrink: 0 }}>
-        <button onClick={onExit} style={{ background: 'none', border: 'none', color: C.muted, fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: 0 }}>←</button>
+        <button onClick={() => {
+          if (isAliveRef.current) {
+            isAliveRef.current = false
+            clearAll()
+            if (scoreRef.current > 0) {
+              addXp(Math.floor(scoreRef.current * 0.4))
+              setHighScore('memory-matrix', scoreRef.current)
+            }
+          }
+          onExit()
+        }} style={{ background: 'none', border: 'none', color: C.muted, fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: 0 }}>←</button>
 
         <div style={{ textAlign: 'center', minWidth: 52 }}>
           <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.15em', color: C.muted, margin: 0 }}>LEVEL</p>
@@ -318,11 +349,9 @@ export default function MemoryMatrixGame({ onExit }: { onExit: () => void }) {
         <div style={{ height: '100%', background: barPct > 35 ? C.memorize : C.wrong, borderRadius: 2, width: `${barPct}%` }} />
       </div>
 
-      {/* Lives — colored dots */}
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 7, paddingBottom: 10, flexShrink: 0 }}>
-        {[0, 1, 2].map(i => (
-          <div key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: i < lives ? C.live : C.liveDead, transition: 'background 0.3s' }} />
-        ))}
+      {/* Lives */}
+      <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 10, flexShrink: 0 }}>
+        <LivesHearts lives={lives} maxLives={3} color={C.live} emptyColor={C.liveDead} />
       </div>
 
       {/* Grid area */}

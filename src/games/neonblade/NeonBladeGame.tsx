@@ -3,14 +3,19 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/useGameStore'
 import { soundMuted } from '../../lib/gameAudio'
 import { vibrate } from '../../lib/haptics'
+import LivesHearts from '../../components/games/LivesHearts'
+import HowToPlayOverlay from '../../components/games/HowToPlayOverlay'
+import { hasSeenTutorial, markTutorialSeen, TUTORIALS } from '../../lib/tutorials'
 
 const BG = '#FFF9E8'
 const W = 390, H = 580
 const COLORS = ['#93DCFF', '#C4B5FD', '#86EFAC', '#FDBA74', '#FCA5A5', '#FCD34D']
 const COMBO_WINDOW = 700
+const START_LIVES = 3
 
 interface Obj { id: number; x: number; y: number; vx: number; vy: number; r: number; bomb: boolean; color: string; sliced: boolean; rot: number; rotSpeed: number }
 interface Particle { x: number; y: number; vx: number; vy: number; life: number; maxLife: number; color: string }
+interface FruitHalf { x: number; y: number; vx: number; vy: number; life: number; maxLife: number; color: string; r: number; rot: number; rotSpeed: number; side: 1 | -1 }
 interface TrailPt { x: number; y: number; t: number }
 
 let _id = 0
@@ -41,17 +46,19 @@ function snd(type: 'slice' | 'bomb' | 'miss' | 'combo' | 'over') {
 export default function NeonBladeGame({ onExit }: { onExit: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const { addXp, setHighScore, highScores } = useGameStore()
-  const [phase, setPhase] = useState<'start' | 'play' | 'over'>('start')
+  const [phase, setPhase] = useState<'start' | 'howto' | 'play' | 'over'>('start')
   const [score, setScore] = useState(0)
   const [combo, setCombo] = useState(0)
-  const [lives, setLives] = useState(3)
+  const [lives, setLives] = useState(START_LIVES)
   const [comboFlash, setComboFlash] = useState<string | null>(null)
 
   const objs = useRef<Obj[]>([])
   const parts = useRef<Particle[]>([])
+  const halves = useRef<FruitHalf[]>([])
   const trail = useRef<TrailPt[]>([])
   const alive = useRef(false), raf = useRef(0)
-  const scoreRef = useRef(0), livesRef = useRef(3), comboRef = useRef(0), lastSlice = useRef(0)
+  const scoreRef = useRef(0), livesRef = useRef(START_LIVES), comboRef = useRef(0), lastSlice = useRef(0)
+  const endedRef = useRef(false)
   const spawnTimer = useRef<ReturnType<typeof setTimeout>>(0 as unknown as ReturnType<typeof setTimeout>)
   const dragging = useRef(false)
   const last = useRef<{ x: number; y: number } | null>(null)
@@ -65,6 +72,8 @@ export default function NeonBladeGame({ onExit }: { onExit: () => void }) {
   }, [])
 
   const doEnd = useCallback(() => {
+    if (endedRef.current) return
+    endedRef.current = true
     alive.current = false; clearTimeout(spawnTimer.current)
     snd('over'); vibrate([30, 40, 60])
     addXp(Math.floor(scoreRef.current * 0.3))
@@ -97,8 +106,9 @@ export default function NeonBladeGame({ onExit }: { onExit: () => void }) {
 
     objs.current.forEach(o => { o.x += o.vx; o.y += o.vy; o.vy += 0.22; o.rot += o.rotSpeed })
     objs.current = objs.current.filter(o => {
+      if (o.sliced) return false
       if (o.y > H + 60) {
-        if (!o.sliced && !o.bomb) {
+        if (!o.bomb) {
           livesRef.current--; setLives(livesRef.current)
           comboRef.current = 0; setCombo(0)
           snd('miss'); vibrate(20)
@@ -111,6 +121,7 @@ export default function NeonBladeGame({ onExit }: { onExit: () => void }) {
 
     trail.current = trail.current.filter(p => Date.now() - p.t < 160)
     parts.current = parts.current.map(p => ({ ...p, x: p.x + p.vx, y: p.y + p.vy, vy: p.vy + 0.15, life: p.life - 1 })).filter(p => p.life > 0)
+    halves.current = halves.current.map(h => ({ ...h, x: h.x + h.vx, y: h.y + h.vy, vy: h.vy + 0.25, rot: h.rot + h.rotSpeed, life: h.life - 1 })).filter(h => h.life > 0)
 
     const dpr = window.devicePixelRatio || 1
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
@@ -139,6 +150,23 @@ export default function NeonBladeGame({ onExit }: { onExit: () => void }) {
       }
       ctx.restore()
     })
+
+    halves.current.forEach(h => {
+      ctx.save()
+      ctx.globalAlpha = Math.max(0, h.life / h.maxLife)
+      ctx.translate(h.x, h.y)
+      ctx.rotate(h.rot + (h.side > 0 ? 0 : Math.PI))
+      ctx.fillStyle = h.color
+      ctx.shadowColor = h.color; ctx.shadowBlur = 8
+      ctx.beginPath()
+      ctx.moveTo(0, 0)
+      ctx.arc(0, 0, h.r, 0, Math.PI)
+      ctx.closePath()
+      ctx.fill()
+      ctx.shadowBlur = 0
+      ctx.restore()
+    })
+    ctx.globalAlpha = 1
 
     if (trail.current.length > 1) {
       ctx.strokeStyle = '#93DCFF'; ctx.lineWidth = 4; ctx.lineCap = 'round'
@@ -172,10 +200,9 @@ export default function NeonBladeGame({ onExit }: { onExit: () => void }) {
       if (Math.hypot(o.x - cx, o.y - cy) < o.r + 6) {
         o.sliced = true
         if (o.bomb) {
-          scoreRef.current = Math.max(0, scoreRef.current - 100); setScore(scoreRef.current)
-          comboRef.current = 0; setCombo(0)
           snd('bomb'); vibrate([30, 20, 30])
           burst(o.x, o.y, '#FF6B6B', 18)
+          doEnd()
         } else {
           const now = Date.now()
           if (now - lastSlice.current < COMBO_WINDOW) comboRef.current++
@@ -186,6 +213,15 @@ export default function NeonBladeGame({ onExit }: { onExit: () => void }) {
           scoreRef.current += pts; setScore(scoreRef.current)
           snd('slice'); vibrate(8)
           burst(o.x, o.y, o.color, 10)
+
+          const segAngle = Math.atan2(dy, dx)
+          const perp = segAngle + Math.PI / 2
+          const speed = 2.2 + Math.random() * 1.2
+          halves.current.push(
+            { x: o.x, y: o.y, vx: Math.cos(perp) * speed + o.vx * 0.3, vy: Math.sin(perp) * speed + o.vy * 0.3 - 1.5, life: 32, maxLife: 32, color: o.color, r: o.r, rot: o.rot, rotSpeed: 0.16 + Math.random() * 0.08, side: 1 },
+            { x: o.x, y: o.y, vx: -Math.cos(perp) * speed + o.vx * 0.3, vy: -Math.sin(perp) * speed + o.vy * 0.3 - 1.5, life: 32, maxLife: 32, color: o.color, r: o.r, rot: o.rot, rotSpeed: -(0.16 + Math.random() * 0.08), side: -1 }
+          )
+
           if (comboRef.current > 0 && comboRef.current % 5 === 0) {
             snd('combo'); vibrate([10, 15, 10])
             setComboFlash(`COMBO ×${comboRef.current}`)
@@ -194,7 +230,7 @@ export default function NeonBladeGame({ onExit }: { onExit: () => void }) {
         }
       }
     }
-  }, [burst])
+  }, [burst, doEnd])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -229,9 +265,10 @@ export default function NeonBladeGame({ onExit }: { onExit: () => void }) {
   }, [phase, trySlice])
 
   const startGame = useCallback(() => {
-    objs.current = []; parts.current = []; trail.current = []
-    scoreRef.current = 0; livesRef.current = 3; comboRef.current = 0; lastSlice.current = 0
-    setScore(0); setLives(3); setCombo(0); setComboFlash(null)
+    objs.current = []; parts.current = []; halves.current = []; trail.current = []
+    scoreRef.current = 0; livesRef.current = START_LIVES; comboRef.current = 0; lastSlice.current = 0
+    endedRef.current = false
+    setScore(0); setLives(START_LIVES); setCombo(0); setComboFlash(null)
     alive.current = true
     clearTimeout(spawnTimer.current)
     scheduleSpawn()
@@ -239,6 +276,20 @@ export default function NeonBladeGame({ onExit }: { onExit: () => void }) {
   }, [scheduleSpawn])
 
   useEffect(() => () => { alive.current = false; cancelAnimationFrame(raf.current); clearTimeout(spawnTimer.current) }, [])
+
+  // Exiting mid-game keeps whatever XP/high-score the player has earned so
+  // far, using the same formula the natural game-over path uses. Guarded by
+  // endedRef so a bomb-death or lives-out ending right before the tap
+  // doesn't award XP twice.
+  const handleExit = useCallback(() => {
+    if (!endedRef.current) {
+      endedRef.current = true
+      alive.current = false; clearTimeout(spawnTimer.current)
+      addXp(Math.floor(scoreRef.current * 0.3))
+      setHighScore('neon-blade', scoreRef.current)
+    }
+    onExit()
+  }, [addXp, setHighScore, onExit])
 
   const best = highScores['neon-blade'] ?? 0
 
@@ -255,11 +306,24 @@ export default function NeonBladeGame({ onExit }: { onExit: () => void }) {
         <h1 style={{ fontSize: 28, fontWeight: 900, color: '#1A1A2E', margin: '0 0 8px', letterSpacing: '0.05em' }}>NEON BLADE</h1>
         <p style={{ color: '#BBB', fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', margin: 0 }}>SWIPE TO SLICE · AVOID BOMBS</p>
       </div>
-      <motion.button whileTap={{ scale: 0.96 }} onClick={startGame}
+      <motion.button whileTap={{ scale: 0.96 }} onClick={() => { if (hasSeenTutorial('neon-blade')) startGame(); else setPhase('howto') }}
         style={{ background: '#1A1A2E', color: BG, border: 'none', borderRadius: 16, padding: '16px 64px', fontSize: 18, fontWeight: 900, cursor: 'pointer', letterSpacing: '0.12em' }}>
         PLAY
       </motion.button>
       {best > 0 && <p style={{ color: '#BBB', fontSize: 13, margin: 0 }}>BEST: {best.toLocaleString()}</p>}
+    </div>
+  )
+
+  if (phase === 'howto') return (
+    <div style={{ width: '100%', height: '100%', position: 'relative', background: '#171334' }}>
+      <HowToPlayOverlay
+        bg="#171334"
+        accent="#93DCFF"
+        textColor="#F2F2F5"
+        mutedColor="#8A8A9A"
+        bullets={TUTORIALS['neon-blade']}
+        onStart={() => { markTutorialSeen('neon-blade'); startGame() }}
+      />
     </div>
   )
 
@@ -285,14 +349,12 @@ export default function NeonBladeGame({ onExit }: { onExit: () => void }) {
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: '#0B0920', fontFamily: 'system-ui,sans-serif' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 20px 6px', flexShrink: 0 }}>
-        <button onClick={() => { alive.current = false; onExit() }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)', fontSize: 20, cursor: 'pointer', padding: 0 }}>←</button>
+        <button onClick={handleExit} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)', fontSize: 20, cursor: 'pointer', padding: 0 }}>←</button>
         <div style={{ textAlign: 'center' }}>
           <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.15em', color: 'rgba(255,255,255,0.35)', margin: 0 }}>SCORE</p>
           <p style={{ fontSize: 20, fontWeight: 900, color: 'white', margin: 0, lineHeight: 1.1 }}>{score.toLocaleString()}</p>
         </div>
-        <div style={{ display: 'flex', gap: 5 }}>
-          {[0, 1, 2].map(i => <div key={i} style={{ width: 11, height: 11, borderRadius: '50%', background: i < lives ? '#93DCFF' : 'rgba(255,255,255,0.1)' }} />)}
-        </div>
+        <LivesHearts lives={lives} maxLives={START_LIVES} color="#FF6B6B" />
       </div>
       {combo > 1 && <p style={{ textAlign: 'center', fontSize: 11, fontWeight: 900, color: '#C4B5FD', margin: '2px 0 0', letterSpacing: '0.1em' }}>COMBO ×{combo}</p>}
       <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', position: 'relative' }}>

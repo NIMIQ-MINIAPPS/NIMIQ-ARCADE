@@ -4,6 +4,8 @@ import type { TouchEvent as ReactTouchEvent } from 'react'
 import { useGameStore } from '../../store/useGameStore'
 import { soundMuted } from '../../lib/gameAudio'
 import { vibrate } from '../../lib/haptics'
+import { hasSeenTutorial, markTutorialSeen, TUTORIALS } from '../../lib/tutorials'
+import HowToPlayOverlay from '../../components/games/HowToPlayOverlay'
 
 const BG = '#FFF9E8'
 const BOARD_BG = '#0C0A06'
@@ -183,7 +185,7 @@ function snd(type: 'merge' | 'invalid' | 'over') {
 
 export default function MergeHexGame({ onExit }: { onExit: () => void }) {
   const { addXp, setHighScore, highScores } = useGameStore()
-  const [phase, setPhase] = useState<'start' | 'play' | 'over'>('start')
+  const [phase, setPhase] = useState<'start' | 'howto' | 'play' | 'over'>('start')
   const [tiles, setTiles] = useState<Tile[]>([])
   const [score, setScore] = useState(0)
   const [highestTile, setHighestTile] = useState(0)
@@ -194,10 +196,13 @@ export default function MergeHexGame({ onExit }: { onExit: () => void }) {
   const scoreRef = useRef(0)
   const highestRef = useRef(0)
   const busyRef = useRef(false)
+  const activeRef = useRef(false)
   const touchStart = useRef<{ x: number; y: number } | null>(null)
   const popupId = useRef(0)
 
   const doEnd = useCallback(() => {
+    if (!activeRef.current) return
+    activeRef.current = false
     snd('over'); vibrate([30, 40, 60])
     addXp(Math.floor(scoreRef.current * 0.15))
     setHighScore('merge-hex', scoreRef.current)
@@ -212,10 +217,23 @@ export default function MergeHexGame({ onExit }: { onExit: () => void }) {
     scoreRef.current = 0
     highestRef.current = t.reduce((m, x) => Math.max(m, x.value), 0)
     busyRef.current = false
+    activeRef.current = true
     touchStart.current = null
     setTiles(t); setScore(0); setHighestTile(highestRef.current); setMoveCount(0); setPopup(null)
     setPhase('play')
   }, [])
+
+  const handleExit = useCallback(() => {
+    busyRef.current = true
+    if (activeRef.current) {
+      activeRef.current = false
+      if (scoreRef.current > 0) {
+        addXp(Math.floor(scoreRef.current * 0.15))
+        setHighScore('merge-hex', scoreRef.current)
+      }
+    }
+    onExit()
+  }, [addXp, setHighScore, onExit])
 
   const move = useCallback((dirIndex: number) => {
     if (phase !== 'play' || busyRef.current) return
@@ -312,11 +330,18 @@ export default function MergeHexGame({ onExit }: { onExit: () => void }) {
         <h1 style={{ fontSize: 26, fontWeight: 900, color: '#1A1A2E', margin: '0 0 8px', letterSpacing: '0.05em' }}>MERGE HEX</h1>
         <p style={{ color: '#BBB', fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', margin: 0 }}>2048 ON A HEXAGONAL GRID</p>
       </div>
-      <motion.button whileTap={{ scale: 0.96 }} onClick={startGame}
+      <motion.button whileTap={{ scale: 0.96 }} onClick={() => { if (hasSeenTutorial('merge-hex')) startGame(); else setPhase('howto') }}
         style={{ background: '#1A1A2E', color: BG, border: 'none', borderRadius: 16, padding: '16px 64px', fontSize: 18, fontWeight: 900, cursor: 'pointer', letterSpacing: '0.12em' }}>
         PLAY
       </motion.button>
       {best > 0 && <p style={{ color: '#BBB', fontSize: 13, margin: 0 }}>BEST: {best.toLocaleString()}</p>}
+    </div>
+  )
+
+  if (phase === 'howto') return (
+    <div style={{ width: '100%', height: '100%', position: 'relative', fontFamily: 'system-ui,sans-serif' }}>
+      <HowToPlayOverlay bg={BG} accent="#1A1A2E" bullets={TUTORIALS['merge-hex']}
+        onStart={() => { markTutorialSeen('merge-hex'); startGame() }} />
     </div>
   )
 
@@ -348,7 +373,7 @@ export default function MergeHexGame({ onExit }: { onExit: () => void }) {
   return (
     <div style={{ width: '100%', height: '100%', background: BOARD_BG, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui,sans-serif', overflow: 'hidden' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 20px 4px', flexShrink: 0 }}>
-        <button onClick={() => { busyRef.current = true; onExit() }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)', fontSize: 20, cursor: 'pointer', padding: 0 }}>←</button>
+        <button onClick={handleExit} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)', fontSize: 20, cursor: 'pointer', padding: 0 }}>←</button>
         <div style={{ textAlign: 'center' }}>
           <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.15em', color: 'rgba(255,255,255,0.35)', margin: 0 }}>SCORE</p>
           <p style={{ fontSize: 18, fontWeight: 900, color: '#FFE9BE', margin: 0, lineHeight: 1.1 }}>{score.toLocaleString()}</p>
