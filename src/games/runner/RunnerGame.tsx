@@ -5,81 +5,31 @@ import HowToPlayOverlay from '../../components/games/HowToPlayOverlay'
 import { hasSeenTutorial, markTutorialSeen, TUTORIALS } from '../../lib/tutorials'
 
 const BG = '#FFF8E8'
-const W = 380, H = 400
-// A single fixed hop, no gravity simulation — same height/speed every time.
-const JUMP_FRAMES = 32, JUMP_HEIGHT = 140, GROUND = H - 48
+const W = 380, H = 400, GROUND = H - 48
 const PX = 60, PR = 16
-// No real ceiling — speed keeps climbing for the entire run, it just ramps
-// up fast early on and much more gradually after DIST_BREAK, so a long run
-// keeps getting harder forever instead of flatlining at a farmable speed.
-const SPEED_INIT = 6.5, SPEED_RATE_EARLY = 0.007, SPEED_RATE_LATE = 0.0015, DIST_BREAK = 1400
 const PC = '#4CC9F0'   // player cyan
 const GC = '#FFD166'   // ground yellow
 
-function obstacleColor(dist: number): string {
-  if (dist < 350)  return '#FF6B6B'
-  if (dist < 700)  return '#FF9F43'
-  if (dist < 1050) return '#FDBA74'
-  if (dist < 1400) return '#F4A261'
-  return ['#FF6B6B','#C4B5FD','#86EFAC'][Math.floor(dist/1400) % 3]
-}
+// Chrome's T-Rex Runner's actual feel, reimplemented with our own look —
+// real delta-time physics (not frame-counted, so it stays smooth and
+// frame-rate independent) using values close to the real game's own
+// px/s-scale constants rather than ad-hoc tuning.
+const GRAVITY = 2000            // px/s²
+const HOLD_GRAVITY_MULT = 0.45  // reduced effective gravity while the hold window is active
+const HOLD_WINDOW = 0.16        // seconds — release before this = a short hop, hold past it = full jump
+const JUMP_VELOCITY = -700      // px/s, initial upward velocity
+const SPEED_INIT = 480          // px/s
+const SPEED_MAX = 900           // px/s
+const SPEED_RAMP = 1.5          // px/s per second of play (= +15 px/s every 10s)
+const HITBOX_MARGIN = 0.93      // collision box is ~93% of the visual sprite — small forgiveness margin
+const DIST_SCALE = 40           // world px per displayed "m"
 
-type ObstacleType = 'block' | 'spike' | 'crystal' | 'saw'
-type OData = { x: number; w: number; h: number; color: string; type: ObstacleType; rot?: number }
-type Coin  = { x: number; y: number; collected: boolean }
+type Shape = 'block' | 'spike' | 'crystal' | 'saw' | 'flyer'
+interface Obstacle { x:number; w:number; h:number; color:string; shape:Shape; flyOffset?:number; rot?:number; wing?:number }
+interface Cloud { x:number; y:number; s:number }
+interface Coin { x:number; y:number; collected:boolean }
 
-// Type pool widens with distance — new shapes keep getting introduced
-// instead of the run looking the same forever.
-function pickType(dist: number): ObstacleType {
-  const pool: ObstacleType[] = ['block', 'spike']
-  if (dist >= 500)  pool.push('crystal')
-  if (dist >= 1000) pool.push('saw', 'crystal')
-  return pool[Math.floor(Math.random() * pool.length)]
-}
-
-function genGroup(dist: number): OData[] {
-  const c = obstacleColor(dist)
-  const r = Math.random
-  let arr: { x: number; w: number; h: number; color: string }[]
-  if (dist < 350) {
-    arr = [{ x:W+10, w:26, h:40+r()*45, color:c }]
-  } else if (dist < 700) {
-    arr = r()<0.45
-      ? [{ x:W+10,w:23,h:40+r()*45,color:c },{ x:W+40,w:23,h:40+r()*60,color:c }]
-      : [{ x:W+10,w:26,h:45+r()*60,color:c }]
-  } else if (dist < 1050) {
-    arr = r()<0.5
-      ? [{ x:W+10,w:22,h:55+r()*65,color:c },{ x:W+40,w:22,h:35+r()*45,color:c }]
-      : [{ x:W+10,w:26,h:60+r()*70,color:c }]
-  } else if (dist < 1400) {
-    const n = r()<0.5 ? 3 : 2
-    arr = Array.from({length:n},(_,i)=>({ x:W+10+i*34,w:22,h:45+r()*60,color:c }))
-  } else {
-    const roll = r()
-    if (roll < 0.3) arr = [
-      { x:W+10,w:22,h:65+r()*60,color:c },
-      { x:W+42,w:22,h:40+r()*40,color:c },
-      { x:W+128+r()*36,w:22,h:65+r()*60,color:c },
-    ]
-    else if (roll < 0.55) arr = [
-      { x:W+10,w:22,h:85+r()*40,color:c },
-      { x:W+42,w:22,h:40+r()*35,color:c },
-      { x:W+74,w:22,h:85+r()*40,color:c },
-    ]
-    else if (roll < 0.8) arr = Array.from({length:3},(_,i)=>({ x:W+10+i*34,w:20,h:50+r()*70,color:c }))
-    else arr = Array.from({length:4},(_,i)=>({ x:W+10+i*30,w:18,h:45+r()*65,color:c }))
-  }
-  return arr.map(o => {
-    const type = pickType(dist)
-    // Saws read as a spinning blade, not a tall spike — clamp to a
-    // sensible round size regardless of what height this tier rolled.
-    if (type === 'saw') {
-      const d = 32 + r()*16
-      return { ...o, w: d, h: d, type, rot: 0 }
-    }
-    return { ...o, type }
-  })
-}
+const PALETTE = ['#FF6B6B','#FF9F43','#C4B5FD','#86EFAC','#93DCFF']
 
 function hexPts(cx:number,cy:number,r:number){ return Array.from({length:6},(_,i)=>{ const a=(Math.PI/3)*i-Math.PI/6; return `${cx+r*Math.cos(a)},${cy+r*Math.sin(a)}` }).join(' ') }
 
@@ -90,7 +40,7 @@ function drawHex(ctx:CanvasRenderingContext2D,cx:number,cy:number,r:number,col:s
 }
 
 let _ac: AudioContext|null=null
-function snd(type:'jump'|'coin'|'doom'){
+function snd(type:'jump'|'coin'|'doom'|'score'){
   try{
     if(!_ac) _ac=new (window.AudioContext||(window as any).webkitAudioContext)()
     const c=_ac,t=c.currentTime
@@ -99,10 +49,63 @@ function snd(type:'jump'|'coin'|'doom'){
       g.gain.setValueAtTime(vol,at); g.gain.exponentialRampToValueAtTime(0.001,at+dur)
       o.connect(g); g.connect(c.destination); o.start(at); o.stop(at+dur)
     }
-    if(type==='jump') { n(440,t,0.08,0.07,'triangle'); n(550,t+0.04,0.06,0.05) }
-    if(type==='coin') [880,1100].forEach((f,i)=>n(f,t+i*0.05,0.08,0.08))
-    if(type==='doom') { n(180,t,0.4,0.18,'sawtooth'); n(130,t+0.3,0.4,0.14,'square') }
+    if(type==='jump')  { n(440,t,0.08,0.07,'triangle'); n(550,t+0.04,0.06,0.05) }
+    if(type==='coin')  [880,1100].forEach((f,i)=>n(f,t+i*0.05,0.08,0.08))
+    if(type==='doom')  { n(180,t,0.4,0.18,'sawtooth'); n(130,t+0.3,0.4,0.14,'square') }
+    if(type==='score') n(1000,t,0.05,0.05,'square')
   } catch{/**/}
+}
+
+// ── Difficulty director ─────────────────────────────────────────────────
+// Small obstacles only for the first 15s, large ones unlock at 15s,
+// clusters at 30s, flying obstacles at 60s — and a cost-1/2/3 budget so two
+// "hard" (cost >= 2) obstacles never land back to back: right after one, the
+// next spawn is heavily biased toward a cheap single obstacle, and hard
+// spawns always add an extra ~0.8-1.2s of travel time on top of the normal
+// gap so there's always a real window to react.
+function genGroup(elapsed: number, prevCost: number): { list: Obstacle[]; cost: number } {
+  const r = Math.random
+  const canLarge = elapsed >= 15
+  const canCluster = elapsed >= 30
+  const canFlyer = elapsed >= 60
+  const forceSmall = prevCost >= 2 && r() < 0.75
+
+  let kind: 'small' | 'large' | 'cluster' | 'flyer' = 'small'
+  if (!forceSmall) {
+    const roll = r()
+    if (canFlyer && roll < 0.15) kind = 'flyer'
+    else if (canCluster && roll < 0.35) kind = 'cluster'
+    else if (canLarge && roll < 0.55) kind = 'large'
+  }
+
+  const color = PALETTE[Math.floor(r()*PALETTE.length)]
+
+  if (kind === 'small') {
+    const shape: Shape = r()<0.5 ? 'block' : 'spike'
+    return { list: [{ x:W+10, w:24, h:34+r()*20, color, shape }], cost: 1 }
+  }
+  if (kind === 'large') {
+    const shape: Shape = r()<0.5 ? 'crystal' : 'block'
+    return { list: [{ x:W+10, w:28, h:75+r()*30, color, shape }], cost: 2 }
+  }
+  if (kind === 'cluster') {
+    const n = 2 + Math.floor(r()*3) // 2-4
+    const shapes: Shape[] = ['block','spike','crystal','saw']
+    const list: Obstacle[] = []
+    let cx = W+10
+    for (let i=0;i<n;i++){
+      const shape = shapes[Math.floor(r()*shapes.length)]
+      const size = shape==='saw' ? 30+r()*10 : 0
+      const w = shape==='saw' ? size : 20+r()*8
+      const h = shape==='saw' ? size : 40+r()*40
+      list.push({ x:cx, w, h, color, shape, rot: shape==='saw' ? 0 : undefined })
+      cx += w + 20 + r()*15 // 20-35px separation, matches a tight recognizable cluster
+    }
+    return { list, cost: 3 }
+  }
+  // flyer — elevated well above ground so it can't be walked under, but
+  // still within the jump's reachable height band.
+  return { list: [{ x:W+10, w:26, h:20, color:'#7C6BFF', shape:'flyer', flyOffset:60, wing:0 }], cost: 3 }
 }
 
 export default function RunnerGame({ onExit }: { onExit: () => void }) {
@@ -113,25 +116,32 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
   const [distDisp,  setDistDisp]  = useState(0)
   const [scoreDisp, setScoreDisp] = useState(0)
 
-  const pY    = useRef(GROUND-PR), jumping = useRef(false), jumpT = useRef(0)
-  const spd   = useRef(SPEED_INIT), dist = useRef(0), sc = useRef(0)
-  const obs   = useRef<OData[]>([]), coins = useRef<Coin[]>([])
-  const lastCoin = useRef(0), coinFlash = useRef(0)
-  const rollAngle = useRef(0)
-  const spawnCountdown = useRef(0)
-  const alive = useRef(false), raf = useRef(0)
+  const pY = useRef(GROUND-PR), vy = useRef(0), grounded = useRef(true)
+  const holding = useRef(false), holdTimer = useRef(0)
+  const spd = useRef(SPEED_INIT), dist = useRef(0), elapsed = useRef(0), sc = useRef(0)
+  const obs = useRef<Obstacle[]>([]), clouds = useRef<Cloud[]>([]), coins = useRef<Coin[]>([])
+  const lastCoinM = useRef(0), coinFlash = useRef(0), lastScoreSound = useRef(0)
+  const nextCloudIn = useRef(3), spawnCountdown = useRef(0), prevCost = useRef(0)
+  const groundOffset = useRef(0), rollAngle = useRef(0)
+  const alive = useRef(false), raf = useRef(0), lastT = useRef(0)
 
-  const jump = useCallback(() => {
-    if (!alive.current || jumping.current) return
-    jumping.current = true; jumpT.current = 0; snd('jump')
+  const startJump = useCallback(() => {
+    if (!alive.current || !grounded.current) return
+    vy.current = JUMP_VELOCITY; grounded.current = false
+    holding.current = true; holdTimer.current = 0
+    snd('jump')
   }, [])
+  const endJump = useCallback(() => { holding.current = false }, [])
 
   const startGame = useCallback(() => {
-    pY.current=GROUND-PR; jumping.current=false; jumpT.current=0
-    spd.current=SPEED_INIT; dist.current=0; sc.current=0
-    obs.current=[]; coins.current=[]; lastCoin.current=0; coinFlash.current=0
-    rollAngle.current=0; spawnCountdown.current=0
-    alive.current=true; setDistDisp(0); setScoreDisp(0); setPhase('play')
+    pY.current=GROUND-PR; vy.current=0; grounded.current=true
+    holding.current=false; holdTimer.current=0
+    spd.current=SPEED_INIT; dist.current=0; elapsed.current=0; sc.current=0
+    obs.current=[]; clouds.current=[]; coins.current=[]
+    lastCoinM.current=0; coinFlash.current=0; lastScoreSound.current=0
+    nextCloudIn.current=2; spawnCountdown.current=0; prevCost.current=0
+    groundOffset.current=0; rollAngle.current=0
+    alive.current=true; lastT.current=0; setDistDisp(0); setScoreDisp(0); setPhase('play')
   }, [])
 
   useEffect(() => {
@@ -141,69 +151,90 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
     const dpr    = window.devicePixelRatio||1
     canvas.width = W*dpr; canvas.height = H*dpr
     ctx.scale(dpr, dpr)
-    let frame = 0
 
-    function loop() {
+    function loop(t: number) {
       if (!alive.current) return
-      frame++
+      if (!lastT.current) lastT.current = t
+      const dt = Math.min(0.05, (t - lastT.current) / 1000)
+      lastT.current = t
+
+      elapsed.current += dt
+      spd.current = Math.min(SPEED_MAX, SPEED_INIT + elapsed.current * SPEED_RAMP)
       const sp = spd.current
-      spd.current = dist.current < DIST_BREAK
-        ? SPEED_INIT + dist.current * SPEED_RATE_EARLY
-        : SPEED_INIT + DIST_BREAK * SPEED_RATE_EARLY + (dist.current - DIST_BREAK) * SPEED_RATE_LATE
-      dist.current += sp * 0.05
+      dist.current += sp * dt
+      const distM = dist.current / DIST_SCALE
+      setDistDisp(Math.floor(distM))
 
-      if (frame%3===0) setDistDisp(Math.floor(dist.current))
-
-      // Jump — one fixed hop, no gravity accumulation
-      if (jumping.current) {
-        jumpT.current += 1 / JUMP_FRAMES
-        if (jumpT.current >= 1) { jumpT.current = 1; jumping.current = false }
-        pY.current = (GROUND-PR) - JUMP_HEIGHT * Math.sin(jumpT.current * Math.PI)
+      // Jump physics — real gravity, with a short reduced-gravity window
+      // while held for a variable jump height (tap = low hop, hold = full).
+      if (!grounded.current) {
+        holdTimer.current += dt
+        const g = (holding.current && holdTimer.current < HOLD_WINDOW) ? GRAVITY*HOLD_GRAVITY_MULT : GRAVITY
+        vy.current += g*dt
+        pY.current += vy.current*dt
+        if (pY.current >= GROUND-PR) { pY.current = GROUND-PR; vy.current = 0; grounded.current = true }
       } else {
         pY.current = GROUND-PR
       }
 
-      // Spawn obstacles — a countdown ticking down by the current speed each
-      // frame, independent of canvas width. (Comparing the rightmost
-      // obstacle's position against the canvas width used to gate this —
-      // that broke once speed got high enough that the required gap in
-      // pixels exceeded W itself, silently stopping all future spawns.)
-      // The countdown is defined in TIME (frames): the jump is a fixed
-      // 32-frame hop, so early on it resets to comfortably more than that
-      // (a real landing window every time), decaying toward a 24-frame
-      // floor exponentially — paired with speed that never stops climbing,
-      // a long run keeps genuinely getting harder instead of flatlining.
-      const framesNeeded = 24 + 22 * Math.exp(-dist.current / 2200)
-      spawnCountdown.current -= sp
+      // Spawn obstacles — a countdown that ticks down by distance travelled
+      // (independent of canvas width), matching the real game: never a
+      // fixed distance, always a range, and a bit wider once you're faster
+      // so there's always time to react.
+      spawnCountdown.current -= sp*dt
       if (spawnCountdown.current <= 0) {
-        obs.current.push(...genGroup(dist.current))
-        spawnCountdown.current = Math.max(80, sp * framesNeeded)
+        const { list, cost } = genGroup(elapsed.current, prevCost.current)
+        obs.current.push(...list)
+        const baseGap = 250 + Math.random()*250 + sp/6
+        const reactionBonus = cost >= 2 ? sp * (0.8 + Math.random()*0.4) : 0
+        spawnCountdown.current = baseGap + reactionBonus
+        prevCost.current = cost
       }
-      obs.current.forEach(o=>{ o.x-=sp; if (o.type === 'saw') o.rot = (o.rot ?? 0) + 0.14 })
+      obs.current.forEach(o=>{ o.x -= sp*dt; if (o.shape==='saw') o.rot=(o.rot??0)+3.2*dt; if (o.shape==='flyer') o.wing=((o.wing??0)+dt*8)%2 })
       obs.current = obs.current.filter(o=>o.x+o.w>-10)
 
-      // Spawn coins every 1000m
-      if (dist.current >= lastCoin.current + 1000) {
-        lastCoin.current += 1000
+      // Clouds — slow, purely decorative
+      nextCloudIn.current -= dt
+      if (nextCloudIn.current <= 0) {
+        clouds.current.push({ x:W+20, y:24+Math.random()*90, s:0.7+Math.random()*0.6 })
+        nextCloudIn.current = 3 + Math.random()*4
+      }
+      clouds.current.forEach(cl => cl.x -= (20+10*Math.random())*dt)
+      clouds.current = clouds.current.filter(cl => cl.x > -60)
+
+      // Ground texture scroll
+      groundOffset.current = (groundOffset.current - sp*dt) % 46
+
+      // Coins every 400m
+      if (distM >= lastCoinM.current + 400) {
+        lastCoinM.current += 400
         coins.current.push({ x:W+60, y:GROUND-62, collected:false })
       }
-      coins.current.forEach(c=>{ c.x-=sp })
+      coins.current.forEach(c=>{ c.x -= sp*dt })
       coins.current = coins.current.filter(c=>!c.collected && c.x>-20)
       coins.current.forEach(c=>{
         if (!c.collected && Math.abs(c.x-PX)<24 && Math.abs(c.y-pY.current)<24) {
-          c.collected=true; sc.current+=100; coinFlash.current=36; snd('coin')
+          c.collected=true; sc.current+=100; coinFlash.current=0.6; snd('coin')
           setScoreDisp(sc.current)
         }
       })
 
-      // Distance score
-      if (frame%20===0) { sc.current+=1; setScoreDisp(sc.current) }
-      if (coinFlash.current>0) coinFlash.current--
+      // Distance score — 100 points ≈ 1km, a chime every 100
+      const newScore = Math.floor(distM/10)
+      if (newScore !== sc.current) {
+        sc.current = newScore; setScoreDisp(sc.current)
+        if (Math.floor(sc.current/100) > lastScoreSound.current) { lastScoreSound.current = Math.floor(sc.current/100); snd('score') }
+      }
+      if (coinFlash.current>0) coinFlash.current = Math.max(0, coinFlash.current-dt)
 
-      // Collision
-      const pL=PX-PR+3, pR=PX+PR-3, pT=pY.current-PR+3, pB=pY.current+PR-3
+      // Collision — hitbox is ~93% of the visual sprite, a little forgiveness
+      const pr = PR*HITBOX_MARGIN
+      const pL=PX-pr, pR=PX+pr, pT=pY.current-pr, pB=pY.current+pr
       for (const o of obs.current) {
-        if (pR>o.x+2 && pL<o.x+o.w-2 && pB>GROUND-o.h+2 && pT<GROUND) {
+        const shrinkX = o.w*(1-HITBOX_MARGIN)/2, shrinkY = o.h*(1-HITBOX_MARGIN)/2
+        const top = GROUND - (o.flyOffset??0) - o.h
+        const oL=o.x+shrinkX, oR=o.x+o.w-shrinkX, oT=top+shrinkY, oB=top+o.h-shrinkY
+        if (pR>oL && pL<oR && pB>oT && pT<oB) {
           alive.current=false; snd('doom')
           addXp(Math.floor(sc.current*0.3)); setHighScore('runner', sc.current)
           setPhase('over'); return
@@ -211,7 +242,7 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
       }
 
       // ── Draw ─────────────────────────────────────────────────────────
-      if (dist.current >= 1500) {
+      if (distM >= 1500) {
         const h = 42 + Math.sin(Date.now()/5000*Math.PI*2)*10
         ctx.fillStyle = `hsl(${h},80%,96%)`
       } else {
@@ -219,27 +250,35 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
       }
       ctx.fillRect(0,0,W,H)
 
-      // Ground band
+      // Clouds (behind everything else)
+      ctx.fillStyle = 'rgba(255,255,255,0.7)'
+      for (const cl of clouds.current) {
+        ctx.beginPath(); ctx.ellipse(cl.x, cl.y, 22*cl.s, 10*cl.s, 0, 0, Math.PI*2); ctx.fill()
+        ctx.beginPath(); ctx.ellipse(cl.x+14*cl.s, cl.y+3*cl.s, 15*cl.s, 8*cl.s, 0, 0, Math.PI*2); ctx.fill()
+      }
+
+      // Ground band + scrolling texture ticks
       ctx.fillStyle = GC; ctx.fillRect(0,GROUND,W,H-GROUND)
       ctx.fillStyle = '#FFB830'; ctx.fillRect(0,GROUND,W,2)
+      ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 2
+      for (let gx = groundOffset.current; gx < W; gx += 46) {
+        ctx.beginPath(); ctx.moveTo(gx, GROUND+8); ctx.lineTo(gx+10, GROUND+8); ctx.stroke()
+      }
 
-      // Obstacles — four distinct shapes so a long run doesn't look the same
-      // block over and over: rounded crates, sharp spikes, faceted hex
-      // crystals (matching the game's own hex motif), and spinning saws.
+      // Obstacles — five distinct shapes so a long run keeps introducing
+      // new silhouettes: rounded crates, sharp spikes, faceted hex crystals
+      // (matching the game's own hex motif), spinning saws, and — after
+      // 60s — a flying creature you have to time a jump into.
       for (const o of obs.current) {
-        const top = GROUND-o.h
+        const top = GROUND - (o.flyOffset??0) - o.h
         const cx = o.x + o.w/2
 
-        if (o.type === 'spike') {
+        if (o.shape === 'spike') {
           ctx.fillStyle = o.color
-          ctx.beginPath()
-          ctx.moveTo(o.x, GROUND)
-          ctx.lineTo(cx, top)
-          ctx.lineTo(o.x+o.w, GROUND)
-          ctx.closePath(); ctx.fill()
+          ctx.beginPath(); ctx.moveTo(o.x, top+o.h); ctx.lineTo(cx, top); ctx.lineTo(o.x+o.w, top+o.h); ctx.closePath(); ctx.fill()
           ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.5
           ctx.beginPath(); ctx.moveTo(cx, top); ctx.lineTo(cx, top+o.h*0.45); ctx.stroke()
-        } else if (o.type === 'crystal') {
+        } else if (o.shape === 'crystal') {
           const cy = top + o.h/2
           const ry = o.h/2, rx = Math.min(o.w/2, ry*0.75)
           ctx.save(); ctx.translate(cx, cy)
@@ -251,7 +290,7 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
           ctx.strokeStyle = 'rgba(255,255,255,0.3)'
           ctx.beginPath(); ctx.moveTo(0,-ry); ctx.lineTo(0,ry); ctx.stroke()
           ctx.restore()
-        } else if (o.type === 'saw') {
+        } else if (o.shape === 'saw') {
           const rad = o.w/2, cy = top + rad, teeth = 8
           ctx.save(); ctx.translate(cx, cy); ctx.rotate(o.rot ?? 0)
           ctx.fillStyle = o.color
@@ -265,6 +304,16 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
           ctx.closePath(); ctx.fill()
           ctx.fillStyle = 'rgba(0,0,0,0.18)'
           ctx.beginPath(); ctx.arc(0,0,rad*0.32,0,Math.PI*2); ctx.fill()
+          ctx.restore()
+        } else if (o.shape === 'flyer') {
+          const cy = top + o.h/2
+          const flap = Math.sin((o.wing??0)*Math.PI) * 9
+          ctx.save(); ctx.translate(cx, cy)
+          ctx.fillStyle = o.color
+          ctx.beginPath(); ctx.ellipse(0,0,o.w*0.32,o.h*0.4,0,0,Math.PI*2); ctx.fill()
+          ctx.fillStyle = 'rgba(124,107,255,0.55)'
+          ctx.beginPath(); ctx.ellipse(-o.w*0.3,-flap,o.w*0.32,6,0.5,0,Math.PI*2); ctx.fill()
+          ctx.beginPath(); ctx.ellipse(o.w*0.3,-flap,o.w*0.32,6,-0.5,0,Math.PI*2); ctx.fill()
           ctx.restore()
         } else {
           ctx.fillStyle = o.color
@@ -285,7 +334,7 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
       }
 
       // Roll when on ground
-      if (!jumping.current) rollAngle.current += sp * 0.05 / PR
+      if (grounded.current) rollAngle.current += sp*dt / PR
 
       // Player trail (ghost hexes)
       drawHex(ctx,PX-8,pY.current+2,PR*0.65,PC,0.14)
@@ -298,7 +347,6 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
       ctx.fillStyle = PC; ctx.beginPath()
       for(let i=0;i<6;i++){ const a=(Math.PI/3)*i-Math.PI/6; i===0?ctx.moveTo(PR*Math.cos(a),PR*Math.sin(a)):ctx.lineTo(PR*Math.cos(a),PR*Math.sin(a)) }
       ctx.closePath(); ctx.fill()
-      // Highlight slice
       ctx.globalAlpha=0.32; ctx.fillStyle='white'; ctx.beginPath()
       for(let i=0;i<3;i++){ const a=(Math.PI/3)*i-Math.PI/6; i===0?ctx.moveTo(PR*0.55*Math.cos(a),PR*0.55*Math.sin(a)):ctx.lineTo(PR*0.55*Math.cos(a),PR*0.55*Math.sin(a)) }
       ctx.closePath(); ctx.fill()
@@ -306,7 +354,7 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
 
       // Coin collect flash
       if (coinFlash.current > 0) {
-        ctx.globalAlpha = coinFlash.current/36
+        ctx.globalAlpha = coinFlash.current/0.6
         ctx.fillStyle = '#FFD166'
         ctx.font = 'bold 16px system-ui'; ctx.textAlign='center'
         ctx.fillText('+100', PX, pY.current-PR-10)
@@ -319,6 +367,24 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
     raf.current = requestAnimationFrame(loop)
     return () => { cancelAnimationFrame(raf.current); alive.current=false }
   }, [phase, addXp, setHighScore])
+
+  // Keyboard — Space/ArrowUp jump during play, or trigger the primary
+  // button from the start/game-over screens (Chrome Dino convention).
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== 'Space' && e.code !== 'ArrowUp' && e.code !== 'Enter') return
+      e.preventDefault()
+      if (phase === 'play') startJump()
+      else if (phase === 'start') { if (hasSeenTutorial('runner')) startGame(); else setPhase('howto') }
+      else if (phase === 'over') startGame()
+    }
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space' || e.code === 'ArrowUp') endJump()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    return () => { window.removeEventListener('keydown', onKeyDown); window.removeEventListener('keyup', onKeyUp) }
+  }, [phase, startJump, endJump, startGame])
 
   const best = highScores['runner'] ?? 0
 
@@ -361,7 +427,7 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
       <p style={{ fontSize:52,fontWeight:900,color:'#1A1A2E',margin:0,lineHeight:1 }}>{sc.current.toLocaleString()}</p>
       <div style={{ textAlign:'center' }}>
         <p style={{ fontSize:9,fontWeight:700,letterSpacing:'0.15em',color:'#BBB',margin:0 }}>DISTANCE</p>
-        <p style={{ fontSize:20,fontWeight:900,color:'#1A1A2E',margin:0 }}>{Math.floor(dist.current).toLocaleString()}m</p>
+        <p style={{ fontSize:20,fontWeight:900,color:'#1A1A2E',margin:0 }}>{Math.floor(dist.current/DIST_SCALE).toLocaleString()}m</p>
       </div>
       <p style={{ fontSize:13,color:'#AAA',margin:0 }}>XP +{Math.floor(sc.current*0.3)}</p>
       {sc.current>0 && sc.current>=best && (
@@ -405,17 +471,18 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
       {/* Canvas */}
       <div style={{ flex:1,display:'flex',justifyContent:'center',alignItems:'center',overflow:'hidden' }}>
         <canvas ref={canvasRef} width={W} height={H}
-          onClick={jump}
-          style={{ width:'100%',height:'100%',objectFit:'contain',cursor:'pointer',display:'block' }}
+          onPointerDown={startJump} onPointerUp={endJump} onPointerLeave={endJump} onPointerCancel={endJump}
+          style={{ width:'100%',height:'100%',objectFit:'contain',cursor:'pointer',display:'block',touchAction:'none' }}
         />
       </div>
 
-      {/* Jump button */}
-      <motion.button whileTap={{ scale:0.97 }} onPointerDown={jump}
+      {/* Jump button — hold for a higher jump, tap for a short hop */}
+      <motion.button whileTap={{ scale:0.97 }}
+        onPointerDown={startJump} onPointerUp={endJump} onPointerLeave={endJump} onPointerCancel={endJump}
         style={{ flexShrink:0,minHeight:72,paddingBottom:'env(safe-area-inset-bottom, 0px)',background:'rgba(26,26,46,0.05)',border:'none',
           borderTop:'1.5px solid rgba(0,0,0,0.06)',display:'flex',alignItems:'center',
           justifyContent:'center',cursor:'pointer',touchAction:'manipulation',userSelect:'none' }}>
-        <span style={{ fontSize:11,fontWeight:800,letterSpacing:'0.22em',color:'rgba(26,26,46,0.3)' }}>JUMP</span>
+        <span style={{ fontSize:11,fontWeight:800,letterSpacing:'0.22em',color:'rgba(26,26,46,0.3)' }}>JUMP · HOLD FOR HIGHER</span>
       </motion.button>
     </div>
   )
