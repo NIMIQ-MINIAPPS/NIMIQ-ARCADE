@@ -202,7 +202,7 @@ export default function MiniSudokuGame({ onExit }: { onExit: () => void }) {
   // ── How to play ───────────────────────────────────────────────────────
   if (phase === 'howto') return (
     <div style={{ width: '100%', height: '100%', position: 'relative', fontFamily: 'system-ui,sans-serif' }}>
-      <HowToPlayOverlay bg={BG} accent="#1A1A2E" bullets={TUTORIALS['mini-sudoku']}
+      <HowToPlayOverlay bg={BG} accent="#1A1A2E" textColor="#1A1A2E" mutedColor="#999" bullets={TUTORIALS['mini-sudoku']}
         onStart={() => { markTutorialSeen('mini-sudoku'); start() }} />
     </div>
   )

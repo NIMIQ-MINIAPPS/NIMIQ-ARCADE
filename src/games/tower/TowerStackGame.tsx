@@ -263,7 +263,7 @@ export default function TowerStackGame({ onExit }: { onExit: () => void }) {
 
   if (phase === 'howto') return (
     <div style={{ width: '100%', height: '100%', position: 'relative', fontFamily: 'system-ui,sans-serif' }}>
-      <HowToPlayOverlay bg={BG} accent="#93DCFF" bullets={TUTORIALS['tower-stack']}
+      <HowToPlayOverlay bg={BG} accent="#1A1A2E" textColor="#1A1A2E" mutedColor="#999" bullets={TUTORIALS['tower-stack']}
         onStart={() => { markTutorialSeen('tower-stack'); start() }} />
     </div>
   )

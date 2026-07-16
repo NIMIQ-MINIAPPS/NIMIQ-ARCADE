@@ -237,7 +237,7 @@ export default function HexfallGame({ onExit }: { onExit: () => void }) {
   if (phase === 'howto') {
     return (
       <div style={{ width:'100%', height:'100%', background:BG, position:'relative', fontFamily:'system-ui,sans-serif' }}>
-        <HowToPlayOverlay bg={BG} accent="#1A1A2E" bullets={TUTORIALS['hexfall']} onStart={() => { markTutorialSeen('hexfall'); startGame() }} />
+        <HowToPlayOverlay bg={BG} accent="#1A1A2E" textColor="#1A1A2E" mutedColor="#999" bullets={TUTORIALS['hexfall']} onStart={() => { markTutorialSeen('hexfall'); startGame() }} />
       </div>
     )
   }

@@ -199,6 +199,8 @@ export default function PatternSyncGame({ onExit }: { onExit: () => void }) {
         <HowToPlayOverlay
           bg={BG}
           accent="#1A1A2E"
+          textColor="#1A1A2E"
+          mutedColor="#999"
           bullets={TUTORIALS['pattern-sync']}
           onStart={() => { markTutorialSeen('pattern-sync'); start() }}
         />

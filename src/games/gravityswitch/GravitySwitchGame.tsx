@@ -67,19 +67,26 @@ export default function GravitySwitchGame({ onExit }: { onExit: () => void }) {
     const ctx = canvasRef.current?.getContext('2d')
     if (!ctx) { raf.current = requestAnimationFrame(loop); return }
 
-    const speed = Math.min(3 + distance.current * 0.0004, 18)
+    const speed = Math.min(5 + distance.current * 0.001, 26)
     distance.current += speed
     scoreRef.current = Math.floor(distance.current / 8); setScore(scoreRef.current)
 
     const targetY = gravity.current === 'floor' ? BOTTOM - R : TOP + R
-    playerY.current += (targetY - playerY.current) * 0.32
+    playerY.current += (targetY - playerY.current) * 0.34
 
     while (nextSpawnX.current < distance.current + W + 200) {
-      const gap = Math.max(90, 280 - distance.current * 0.008)
+      const gap = Math.max(68, 260 - distance.current * 0.016)
       const side: 'floor' | 'ceiling' = Math.random() < 0.5 ? 'floor' : 'ceiling'
-      const height = 55 + Math.min(distance.current * 0.006, 90) + Math.random() * 20
+      const height = 60 + Math.min(distance.current * 0.011, 115) + Math.random() * 25
       const width = 24 + Math.random() * 14
       obstacles.current.push({ x: nextSpawnX.current, width, side, height, passed: false })
+      // Gauntlet moments once things have ramped up: a second spike from the
+      // opposite side arrives right after, forcing a precisely-timed flip.
+      if (distance.current > 1200 && Math.random() < 0.22) {
+        const oppositeSide: 'floor' | 'ceiling' = side === 'floor' ? 'ceiling' : 'floor'
+        const oppositeHeight = 50 + Math.min(distance.current * 0.008, 90) + Math.random() * 20
+        obstacles.current.push({ x: nextSpawnX.current + width + 46, width: 22 + Math.random() * 10, side: oppositeSide, height: oppositeHeight, passed: false })
+      }
       nextSpawnX.current += gap
     }
     obstacles.current = obstacles.current.filter(o => o.x - distance.current > -60)
@@ -189,7 +196,7 @@ export default function GravitySwitchGame({ onExit }: { onExit: () => void }) {
 
   if (phase === 'howto') return (
     <div style={{ width: '100%', height: '100%', position: 'relative', fontFamily: 'system-ui,sans-serif' }}>
-      <HowToPlayOverlay bg={BG} accent="#93DCFF" bullets={TUTORIALS['gravity-switch']}
+      <HowToPlayOverlay bg={BG} accent="#1A1A2E" textColor="#1A1A2E" mutedColor="#999" bullets={TUTORIALS['gravity-switch']}
         onStart={() => { markTutorialSeen('gravity-switch'); startGame() }} />
     </div>
   )

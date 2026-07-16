@@ -206,6 +206,8 @@ export default function LowdownGame({ onExit }: { onExit: () => void }) {
       <HowToPlayOverlay
         bg={BG}
         accent="#1A1A2E"
+        textColor="#1A1A2E"
+        mutedColor="#999"
         bullets={TUTORIALS['lowdown']}
         onStart={() => { markTutorialSeen('lowdown'); startGame() }}
       />

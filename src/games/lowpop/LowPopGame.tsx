@@ -178,7 +178,7 @@ export default function LowPopGame({ onExit }: { onExit: () => void }) {
   if (showHowTo) {
     return (
       <div style={{ width: '100%', height: '100%', background: BG, position: 'relative', fontFamily: 'system-ui,sans-serif' }}>
-        <HowToPlayOverlay bg={BG} accent="#222" bullets={TUTORIALS['low-pop']} onStart={() => { markTutorialSeen('low-pop'); setShowHowTo(false); start() }} />
+        <HowToPlayOverlay bg={BG} accent="#222" textColor="#1A1A2E" mutedColor="#999" bullets={TUTORIALS['low-pop']} onStart={() => { markTutorialSeen('low-pop'); setShowHowTo(false); start() }} />
       </div>
     )
   }

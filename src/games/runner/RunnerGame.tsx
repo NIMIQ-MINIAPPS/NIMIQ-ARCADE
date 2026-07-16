@@ -6,18 +6,18 @@ import { hasSeenTutorial, markTutorialSeen, TUTORIALS } from '../../lib/tutorial
 
 const BG = '#FFF8E8'
 const W = 380, H = 400
-const GRAVITY = 0.65, JUMP = -13, GROUND = H - 48
+const GRAVITY = 0.78, JUMP = -14, GROUND = H - 48
 const PX = 60, PR = 16
-const SPEED_INIT = 4, SPEED_MAX = 11
+const SPEED_INIT = 6.5, SPEED_MAX = 22
 const PC = '#4CC9F0'   // player cyan
 const GC = '#FFD166'   // ground yellow
 
 function obstacleColor(dist: number): string {
-  if (dist < 500)  return '#FF6B6B'
-  if (dist < 1000) return '#FF9F43'
-  if (dist < 1500) return '#FDBA74'
-  if (dist < 2000) return '#F4A261'
-  return ['#FF6B6B','#C4B5FD','#86EFAC'][Math.floor(dist/2000) % 3]
+  if (dist < 350)  return '#FF6B6B'
+  if (dist < 700)  return '#FF9F43'
+  if (dist < 1050) return '#FDBA74'
+  if (dist < 1400) return '#F4A261'
+  return ['#FF6B6B','#C4B5FD','#86EFAC'][Math.floor(dist/1400) % 3]
 }
 
 type OData = { x: number; w: number; h: number; color: string }
@@ -26,29 +26,30 @@ type Coin  = { x: number; y: number; collected: boolean }
 function genGroup(dist: number): OData[] {
   const c = obstacleColor(dist)
   const r = Math.random
-  if (dist < 500)  return [{ x:W+10, w:26, h:35+r()*40, color:c }]
-  if (dist < 1000) return r()<0.4
-    ? [{ x:W+10,w:23,h:35+r()*40,color:c },{ x:W+42,w:23,h:35+r()*55,color:c }]
-    : [{ x:W+10,w:26,h:40+r()*55,color:c }]
-  if (dist < 1500) return r()<0.45
-    ? [{ x:W+10,w:22,h:50+r()*60,color:c },{ x:W+42,w:22,h:30+r()*40,color:c }]
-    : [{ x:W+10,w:26,h:55+r()*65,color:c }]
-  if (dist < 2000) {
-    const n = r()<0.4 ? 3 : 2
-    return Array.from({length:n},(_,i)=>({ x:W+10+i*36,w:22,h:40+r()*55,color:c }))
+  if (dist < 350)  return [{ x:W+10, w:26, h:40+r()*45, color:c }]
+  if (dist < 700) return r()<0.45
+    ? [{ x:W+10,w:23,h:40+r()*45,color:c },{ x:W+40,w:23,h:40+r()*60,color:c }]
+    : [{ x:W+10,w:26,h:45+r()*60,color:c }]
+  if (dist < 1050) return r()<0.5
+    ? [{ x:W+10,w:22,h:55+r()*65,color:c },{ x:W+40,w:22,h:35+r()*45,color:c }]
+    : [{ x:W+10,w:26,h:60+r()*70,color:c }]
+  if (dist < 1400) {
+    const n = r()<0.5 ? 3 : 2
+    return Array.from({length:n},(_,i)=>({ x:W+10+i*34,w:22,h:45+r()*60,color:c }))
   }
   const roll = r()
-  if (roll < 0.33) return [
-    { x:W+10,w:22,h:60+r()*55,color:c },
-    { x:W+44,w:22,h:35+r()*35,color:c },
-    { x:W+140+r()*40,w:22,h:60+r()*55,color:c },
+  if (roll < 0.3) return [
+    { x:W+10,w:22,h:65+r()*60,color:c },
+    { x:W+42,w:22,h:40+r()*40,color:c },
+    { x:W+128+r()*36,w:22,h:65+r()*60,color:c },
   ]
-  if (roll < 0.66) return [
-    { x:W+10,w:22,h:80+r()*35,color:c },
-    { x:W+44,w:22,h:35+r()*30,color:c },
-    { x:W+78,w:22,h:80+r()*35,color:c },
+  if (roll < 0.55) return [
+    { x:W+10,w:22,h:85+r()*40,color:c },
+    { x:W+42,w:22,h:40+r()*35,color:c },
+    { x:W+74,w:22,h:85+r()*40,color:c },
   ]
-  return Array.from({length:3},(_,i)=>({ x:W+10+i*36,w:20,h:45+r()*65,color:c }))
+  if (roll < 0.8) return Array.from({length:3},(_,i)=>({ x:W+10+i*34,w:20,h:50+r()*70,color:c }))
+  return Array.from({length:4},(_,i)=>({ x:W+10+i*30,w:18,h:45+r()*65,color:c }))
 }
 
 function hexPts(cx:number,cy:number,r:number){ return Array.from({length:6},(_,i)=>{ const a=(Math.PI/3)*i-Math.PI/6; return `${cx+r*Math.cos(a)},${cy+r*Math.sin(a)}` }).join(' ') }
@@ -116,7 +117,7 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
       if (!alive.current) return
       frame++
       const sp = spd.current
-      spd.current = Math.min(SPEED_MAX, SPEED_INIT + dist.current * 0.003)
+      spd.current = Math.min(SPEED_MAX, SPEED_INIT + dist.current * 0.007)
       dist.current += sp * 0.05
 
       if (frame%3===0) setDistDisp(Math.floor(dist.current))
@@ -127,7 +128,7 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
 
       // Spawn obstacles
       const rightmost = obs.current.reduce((mx,o)=>Math.max(mx,o.x+o.w), 0)
-      const gap = dist.current < 1000 ? 250 : dist.current < 2000 ? 210 : 165
+      const gap = dist.current < 700 ? 210 : dist.current < 1400 ? 175 : Math.max(120, 165 - dist.current * 0.005)
       if (rightmost < W - gap) obs.current.push(...genGroup(dist.current))
       obs.current.forEach(o=>{ o.x-=sp })
       obs.current = obs.current.filter(o=>o.x+o.w>-10)
@@ -258,7 +259,7 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
 
   if (phase === 'howto') return (
     <div style={{ width:'100%',height:'100%',position:'relative',fontFamily:'system-ui,sans-serif' }}>
-      <HowToPlayOverlay bg={BG} accent={PC} bullets={TUTORIALS['runner']}
+      <HowToPlayOverlay bg={BG} accent="#1A1A2E" textColor="#1A1A2E" mutedColor="#999" bullets={TUTORIALS['runner']}
         onStart={() => { markTutorialSeen('runner'); startGame() }} />
     </div>
   )
