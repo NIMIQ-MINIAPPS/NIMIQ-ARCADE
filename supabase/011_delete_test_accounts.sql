@@ -10,10 +10,10 @@
 
 select id, display_name, nimiq_address, created_at
 from public.players
-where display_name in ('TestPlayer', 'ContrastCheck')
+where display_name in ('TestPlayer', 'ContrastCheck', 'QAJumpTest')
   and nimiq_address = 'NQ07 0000 0000 0000 0000 0000 0000 0000 0000';
 
 -- Review the preview above, then run:
 delete from public.players
-where display_name in ('TestPlayer', 'ContrastCheck')
+where display_name in ('TestPlayer', 'ContrastCheck', 'QAJumpTest')
   and nimiq_address = 'NQ07 0000 0000 0000 0000 0000 0000 0000 0000';
