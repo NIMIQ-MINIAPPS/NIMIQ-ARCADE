@@ -158,6 +158,13 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
       const dt = Math.min(0.05, (t - lastT.current) / 1000)
       lastT.current = t
 
+      // Any per-frame exception here used to permanently freeze the whole
+      // game (an uncaught throw inside a rAF callback just stops future
+      // frames from ever being scheduled — obstacles, distance, everything
+      // silently stalls with no visible error). Catching it means a single
+      // bad frame gets logged and skipped instead of ending the run dead
+      // in the water.
+      try {
       elapsed.current += dt
       spd.current = Math.min(SPEED_MAX, SPEED_INIT + elapsed.current * SPEED_RAMP)
       const sp = spd.current
@@ -360,8 +367,11 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
         ctx.fillText('+100', PX, pY.current-PR-10)
         ctx.globalAlpha=1
       }
+      } catch (err) {
+        console.error('[HexRunner] frame error, recovering:', err)
+      }
 
-      raf.current = requestAnimationFrame(loop)
+      if (alive.current) raf.current = requestAnimationFrame(loop)
     }
 
     raf.current = requestAnimationFrame(loop)
