@@ -24,36 +24,61 @@ function obstacleColor(dist: number): string {
   return ['#FF6B6B','#C4B5FD','#86EFAC'][Math.floor(dist/1400) % 3]
 }
 
-type OData = { x: number; w: number; h: number; color: string }
+type ObstacleType = 'block' | 'spike' | 'crystal' | 'saw'
+type OData = { x: number; w: number; h: number; color: string; type: ObstacleType; rot?: number }
 type Coin  = { x: number; y: number; collected: boolean }
+
+// Type pool widens with distance — new shapes keep getting introduced
+// instead of the run looking the same forever.
+function pickType(dist: number): ObstacleType {
+  const pool: ObstacleType[] = ['block', 'spike']
+  if (dist >= 500)  pool.push('crystal')
+  if (dist >= 1000) pool.push('saw', 'crystal')
+  return pool[Math.floor(Math.random() * pool.length)]
+}
 
 function genGroup(dist: number): OData[] {
   const c = obstacleColor(dist)
   const r = Math.random
-  if (dist < 350)  return [{ x:W+10, w:26, h:40+r()*45, color:c }]
-  if (dist < 700) return r()<0.45
-    ? [{ x:W+10,w:23,h:40+r()*45,color:c },{ x:W+40,w:23,h:40+r()*60,color:c }]
-    : [{ x:W+10,w:26,h:45+r()*60,color:c }]
-  if (dist < 1050) return r()<0.5
-    ? [{ x:W+10,w:22,h:55+r()*65,color:c },{ x:W+40,w:22,h:35+r()*45,color:c }]
-    : [{ x:W+10,w:26,h:60+r()*70,color:c }]
-  if (dist < 1400) {
+  let arr: { x: number; w: number; h: number; color: string }[]
+  if (dist < 350) {
+    arr = [{ x:W+10, w:26, h:40+r()*45, color:c }]
+  } else if (dist < 700) {
+    arr = r()<0.45
+      ? [{ x:W+10,w:23,h:40+r()*45,color:c },{ x:W+40,w:23,h:40+r()*60,color:c }]
+      : [{ x:W+10,w:26,h:45+r()*60,color:c }]
+  } else if (dist < 1050) {
+    arr = r()<0.5
+      ? [{ x:W+10,w:22,h:55+r()*65,color:c },{ x:W+40,w:22,h:35+r()*45,color:c }]
+      : [{ x:W+10,w:26,h:60+r()*70,color:c }]
+  } else if (dist < 1400) {
     const n = r()<0.5 ? 3 : 2
-    return Array.from({length:n},(_,i)=>({ x:W+10+i*34,w:22,h:45+r()*60,color:c }))
+    arr = Array.from({length:n},(_,i)=>({ x:W+10+i*34,w:22,h:45+r()*60,color:c }))
+  } else {
+    const roll = r()
+    if (roll < 0.3) arr = [
+      { x:W+10,w:22,h:65+r()*60,color:c },
+      { x:W+42,w:22,h:40+r()*40,color:c },
+      { x:W+128+r()*36,w:22,h:65+r()*60,color:c },
+    ]
+    else if (roll < 0.55) arr = [
+      { x:W+10,w:22,h:85+r()*40,color:c },
+      { x:W+42,w:22,h:40+r()*35,color:c },
+      { x:W+74,w:22,h:85+r()*40,color:c },
+    ]
+    else if (roll < 0.8) arr = Array.from({length:3},(_,i)=>({ x:W+10+i*34,w:20,h:50+r()*70,color:c }))
+    else arr = Array.from({length:4},(_,i)=>({ x:W+10+i*30,w:18,h:45+r()*65,color:c }))
   }
-  const roll = r()
-  if (roll < 0.3) return [
-    { x:W+10,w:22,h:65+r()*60,color:c },
-    { x:W+42,w:22,h:40+r()*40,color:c },
-    { x:W+128+r()*36,w:22,h:65+r()*60,color:c },
-  ]
-  if (roll < 0.55) return [
-    { x:W+10,w:22,h:85+r()*40,color:c },
-    { x:W+42,w:22,h:40+r()*35,color:c },
-    { x:W+74,w:22,h:85+r()*40,color:c },
-  ]
-  if (roll < 0.8) return Array.from({length:3},(_,i)=>({ x:W+10+i*34,w:20,h:50+r()*70,color:c }))
-  return Array.from({length:4},(_,i)=>({ x:W+10+i*30,w:18,h:45+r()*65,color:c }))
+  return arr.map(o => {
+    const type = pickType(dist)
+    // Saws read as a spinning blade, not a tall spike — clamp to a
+    // sensible round size regardless of what height this tier rolled.
+    if (type === 'saw') {
+      const d = 32 + r()*16
+      return { ...o, w: d, h: d, type, rot: 0 }
+    }
+    return { ...o, type }
+  })
 }
 
 function hexPts(cx:number,cy:number,r:number){ return Array.from({length:6},(_,i)=>{ const a=(Math.PI/3)*i-Math.PI/6; return `${cx+r*Math.cos(a)},${cy+r*Math.sin(a)}` }).join(' ') }
@@ -93,6 +118,7 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
   const obs   = useRef<OData[]>([]), coins = useRef<Coin[]>([])
   const lastCoin = useRef(0), coinFlash = useRef(0)
   const rollAngle = useRef(0)
+  const spawnCountdown = useRef(0)
   const alive = useRef(false), raf = useRef(0)
 
   const jump = useCallback(() => {
@@ -104,7 +130,7 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
     pY.current=GROUND-PR; jumping.current=false; jumpT.current=0
     spd.current=SPEED_INIT; dist.current=0; sc.current=0
     obs.current=[]; coins.current=[]; lastCoin.current=0; coinFlash.current=0
-    rollAngle.current=0
+    rollAngle.current=0; spawnCountdown.current=0
     alive.current=true; setDistDisp(0); setScoreDisp(0); setPhase('play')
   }, [])
 
@@ -137,19 +163,23 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
         pY.current = GROUND-PR
       }
 
-      // Spawn obstacles — gap is defined in TIME (frames), not pixels, and
-      // converted using the current speed. That's what actually matters for
-      // fairness: the jump is a fixed 32-frame hop, so early on the gap
-      // between groups stays comfortably longer than that (a real landing
-      // window every time). It decays toward a 24-frame floor exponentially
-      // rather than hard-clamping there, so — paired with speed that never
-      // stops climbing above — a long run keeps genuinely getting harder
-      // instead of settling into a farmable, memorizable rhythm.
-      const rightmost = obs.current.reduce((mx,o)=>Math.max(mx,o.x+o.w), 0)
+      // Spawn obstacles — a countdown ticking down by the current speed each
+      // frame, independent of canvas width. (Comparing the rightmost
+      // obstacle's position against the canvas width used to gate this —
+      // that broke once speed got high enough that the required gap in
+      // pixels exceeded W itself, silently stopping all future spawns.)
+      // The countdown is defined in TIME (frames): the jump is a fixed
+      // 32-frame hop, so early on it resets to comfortably more than that
+      // (a real landing window every time), decaying toward a 24-frame
+      // floor exponentially — paired with speed that never stops climbing,
+      // a long run keeps genuinely getting harder instead of flatlining.
       const framesNeeded = 24 + 22 * Math.exp(-dist.current / 2200)
-      const gap = Math.max(80, sp * framesNeeded)
-      if (rightmost < W - gap) obs.current.push(...genGroup(dist.current))
-      obs.current.forEach(o=>{ o.x-=sp })
+      spawnCountdown.current -= sp
+      if (spawnCountdown.current <= 0) {
+        obs.current.push(...genGroup(dist.current))
+        spawnCountdown.current = Math.max(80, sp * framesNeeded)
+      }
+      obs.current.forEach(o=>{ o.x-=sp; if (o.type === 'saw') o.rot = (o.rot ?? 0) + 0.14 })
       obs.current = obs.current.filter(o=>o.x+o.w>-10)
 
       // Spawn coins every 1000m
@@ -193,13 +223,55 @@ export default function RunnerGame({ onExit }: { onExit: () => void }) {
       ctx.fillStyle = GC; ctx.fillRect(0,GROUND,W,H-GROUND)
       ctx.fillStyle = '#FFB830'; ctx.fillRect(0,GROUND,W,2)
 
-      // Obstacles
+      // Obstacles — four distinct shapes so a long run doesn't look the same
+      // block over and over: rounded crates, sharp spikes, faceted hex
+      // crystals (matching the game's own hex motif), and spinning saws.
       for (const o of obs.current) {
         const top = GROUND-o.h
-        ctx.fillStyle = o.color
-        ctx.beginPath(); ctx.roundRect(o.x,top,o.w,o.h,6); ctx.fill()
-        ctx.fillStyle = 'rgba(255,255,255,0.18)'
-        ctx.beginPath(); ctx.roundRect(o.x+2,top+2,o.w-4,o.h*0.32,[5,5,0,0]); ctx.fill()
+        const cx = o.x + o.w/2
+
+        if (o.type === 'spike') {
+          ctx.fillStyle = o.color
+          ctx.beginPath()
+          ctx.moveTo(o.x, GROUND)
+          ctx.lineTo(cx, top)
+          ctx.lineTo(o.x+o.w, GROUND)
+          ctx.closePath(); ctx.fill()
+          ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.5
+          ctx.beginPath(); ctx.moveTo(cx, top); ctx.lineTo(cx, top+o.h*0.45); ctx.stroke()
+        } else if (o.type === 'crystal') {
+          const cy = top + o.h/2
+          const ry = o.h/2, rx = Math.min(o.w/2, ry*0.75)
+          ctx.save(); ctx.translate(cx, cy)
+          ctx.fillStyle = o.color
+          ctx.beginPath()
+          for (let i=0;i<6;i++){ const a=(Math.PI/3)*i-Math.PI/2; const px=rx*Math.cos(a), py=ry*Math.sin(a); i===0?ctx.moveTo(px,py):ctx.lineTo(px,py) }
+          ctx.closePath(); ctx.fill()
+          ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1.5; ctx.stroke()
+          ctx.strokeStyle = 'rgba(255,255,255,0.3)'
+          ctx.beginPath(); ctx.moveTo(0,-ry); ctx.lineTo(0,ry); ctx.stroke()
+          ctx.restore()
+        } else if (o.type === 'saw') {
+          const rad = o.w/2, cy = top + rad, teeth = 8
+          ctx.save(); ctx.translate(cx, cy); ctx.rotate(o.rot ?? 0)
+          ctx.fillStyle = o.color
+          ctx.beginPath()
+          for (let i=0;i<teeth*2;i++){
+            const a = (Math.PI/teeth)*i
+            const rr = i%2===0 ? rad : rad*0.68
+            const px = rr*Math.cos(a), py = rr*Math.sin(a)
+            i===0?ctx.moveTo(px,py):ctx.lineTo(px,py)
+          }
+          ctx.closePath(); ctx.fill()
+          ctx.fillStyle = 'rgba(0,0,0,0.18)'
+          ctx.beginPath(); ctx.arc(0,0,rad*0.32,0,Math.PI*2); ctx.fill()
+          ctx.restore()
+        } else {
+          ctx.fillStyle = o.color
+          ctx.beginPath(); ctx.roundRect(o.x,top,o.w,o.h,6); ctx.fill()
+          ctx.fillStyle = 'rgba(255,255,255,0.18)'
+          ctx.beginPath(); ctx.roundRect(o.x+2,top+2,o.w-4,o.h*0.32,[5,5,0,0]); ctx.fill()
+        }
       }
 
       // Coins
